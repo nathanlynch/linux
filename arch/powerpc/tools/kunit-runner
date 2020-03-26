@@ -1,0 +1,34 @@
+#!/usr/bin/python3
+# SPDX-License-Identifier: GPL-2.0
+
+import subprocess
+import os
+import sys
+
+KernelDirectoryPath = sys.argv[0].split('arch/powerpc/tools/')[0]
+KunitPythonPath = KernelDirectoryPath + 'tools/testing/kunit'
+
+sys.path.insert(0, KunitPythonPath)
+
+import kunit_parser
+
+def run_kernel(timeout=None):
+	cmd = ['qemu-system-ppc64']
+	cmd.extend(['-M', 'pseries'])
+	cmd.extend(['-nodefaults'])
+	cmd.extend(['-nographic'])
+	cmd.extend(['-serial', 'stdio'])
+	cmd.extend(['-monitor', 'none'])
+	cmd.extend(['-m', '1G'])
+	cmd.extend(['-smp', '2'])
+#	cmd.extend(['-append', 'debug console=hvc0'])
+	cmd.extend(['-kernel', 'vmlinux'])
+	process = subprocess.run(cmd, timeout=timeout, capture_output=True, text=True)
+	with open('test.log', 'w') as f:
+		for line in process.stdout.splitlines():
+			f.write(line + '\n')
+			yield line
+
+kunit_parser.print_with_timestamp('Running kernel in qemu')
+kunit_output = run_kernel()
+test_result = kunit_parser.parse_run_tests(kunit_output)
