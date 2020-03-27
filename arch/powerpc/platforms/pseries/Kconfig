@@ -159,3 +159,11 @@ config PPC_SVM
 	 those guests.
 
 	 If unsure, say "N".
+
+config PSERIES_PARTITION_SUSPEND_KUNIT_TEST
+	tristate "KUnit test for pseries partition suspend code"
+	depends on KUNIT
+	help
+	  Enables unit tests for partition suspend code.
+
+	  If unsure, say N.
