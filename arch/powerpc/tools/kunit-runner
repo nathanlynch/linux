@@ -21,6 +21,7 @@ def run_kernel(timeout=None):
 	cmd.extend(['-monitor', 'none'])
 	cmd.extend(['-m', '256M'])
 	cmd.extend(['-kernel', 'vmlinux'])
+	cmd.extend(['-append', 'printk.time=0'])
 	process = subprocess.run(cmd, timeout=timeout, capture_output=True, text=True)
 	with open('test.log', 'w') as f:
 		for line in process.stdout.splitlines():
