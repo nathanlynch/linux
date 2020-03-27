@@ -14,7 +14,7 @@ import kunit_parser
 
 def run_kernel(timeout=None):
 	cmd = ['qemu-system-ppc64']
-	cmd.extend(['-M', 'pseries'])
+	cmd.extend(['-machine', 'type=pseries,accel=kvm:tcg'])
 	cmd.extend(['-nodefaults'])
 	cmd.extend(['-nographic'])
 	cmd.extend(['-serial', 'stdio'])
