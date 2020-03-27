@@ -19,8 +19,7 @@ def run_kernel(timeout=None):
 	cmd.extend(['-nographic'])
 	cmd.extend(['-serial', 'stdio'])
 	cmd.extend(['-monitor', 'none'])
-	cmd.extend(['-m', '1G'])
-	cmd.extend(['-smp', '2'])
+	cmd.extend(['-m', '256M'])
 	cmd.extend(['-kernel', 'vmlinux'])
 	process = subprocess.run(cmd, timeout=timeout, capture_output=True, text=True)
 	with open('test.log', 'w') as f:
