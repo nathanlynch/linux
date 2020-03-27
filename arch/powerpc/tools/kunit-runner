@@ -14,15 +14,14 @@ import kunit_parser
 
 def run_kernel(timeout=None):
 	cmd = ['qemu-system-ppc64']
-	cmd.extend(['-M', 'pseries'])
+	cmd.extend(['-machine', 'type=pseries,accel=kvm:tcg'])
 	cmd.extend(['-nodefaults'])
 	cmd.extend(['-nographic'])
 	cmd.extend(['-serial', 'stdio'])
 	cmd.extend(['-monitor', 'none'])
-	cmd.extend(['-m', '1G'])
-	cmd.extend(['-smp', '2'])
-#	cmd.extend(['-append', 'debug console=hvc0'])
+	cmd.extend(['-m', '256M'])
 	cmd.extend(['-kernel', 'vmlinux'])
+	cmd.extend(['-append', 'printk.time=0'])
 	process = subprocess.run(cmd, timeout=timeout, capture_output=True, text=True)
 	with open('test.log', 'w') as f:
 		for line in process.stdout.splitlines():
