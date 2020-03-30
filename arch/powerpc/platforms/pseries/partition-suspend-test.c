@@ -40,6 +40,16 @@ struct papr_lpar_suspend_session {
 	const struct papr_suspend_ops *ops;
 };
 
+void papr_suspend_session_init(struct papr_lpar_suspend_session *s, u64 handle,
+			       const struct papr_suspend_ops *ops)
+{
+	*s = (struct papr_lpar_suspend_session) {
+		.handle = handle,
+		.state = VASI_SUSPEND_STATE_UNINITIALIZED,
+		.ops = ops,
+	};
+}
+
 struct papr_lpar_suspend_session *
 papr_lpar_suspend_session_new(u64 handle,
 			      const struct papr_suspend_ops *ops)
@@ -50,11 +60,7 @@ papr_lpar_suspend_session_new(u64 handle,
 	if (!s)
 		goto cancel;
 
-	*s = (struct papr_lpar_suspend_session) {
-		.handle = handle,
-		.state = VASI_SUSPEND_STATE_UNINITIALIZED,
-		.ops = ops,
-	};
+	papr_suspend_session_init(s, handle, ops);
 
 	return s;
 cancel:
