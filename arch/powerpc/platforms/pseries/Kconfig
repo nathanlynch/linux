@@ -163,6 +163,7 @@ config PPC_SVM
 config PSERIES_PARTITION_SUSPEND_KUNIT_TEST
 	tristate "KUnit test for pseries partition suspend code"
 	depends on KUNIT
+	depends on SUSPEND
 	help
 	  Enables unit tests for partition suspend code.
 

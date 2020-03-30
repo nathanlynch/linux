@@ -1,6 +1,8 @@
 #ifndef PAPR_SUSPEND_H
 #define PAPR_SUSPEND_H
 
+#include <linux/types.h>
+
 /* All architected results for VASI state request. */
 typedef enum vasi_suspend_state {
 	VASI_SUSPEND_STATE_INVALID    = 0,
@@ -35,6 +37,12 @@ struct papr_suspend_ops {
 
 void papr_suspend_session_init(struct papr_lpar_suspend_session *s, u64 handle,
 			       const struct papr_suspend_ops *ops);
+
 int papr_suspend_lpar(struct papr_lpar_suspend_session *session);
+
+struct papr_lpar_suspend_session *
+papr_lpar_suspend_session_new(u64 handle,
+			      const struct papr_suspend_ops *ops);
+void papr_lpar_suspend_session_finalize(struct papr_lpar_suspend_session *s);
 
 #endif /* PAPR_SUSPEND_H */
