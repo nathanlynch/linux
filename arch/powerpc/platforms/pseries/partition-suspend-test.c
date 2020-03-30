@@ -18,7 +18,12 @@ typedef enum vasi_suspend_state {
 	VASI_SUSPEND_STATE_RESUMED    = 5,
 	VASI_SUSPEND_STATE_COMPLETED  = 6,
 	VASI_SUSPEND_STATE_FAILOVER   = 7,
-	VASI_SUSPEND_STATE_UNINITIALIZED = 9999, /* For convenience, not architected. */
+	/*
+	 * The following are for convenience and test. They are not
+	 * defined in PAPR or used outside of this code.
+	 */
+	VASI_SUSPEND_STATE_TEST_SEQ_END  = 9998,
+	VASI_SUSPEND_STATE_UNINITIALIZED = 9999,
 } vasi_suspend_state_t;
 
 struct papr_lpar_suspend_session;
