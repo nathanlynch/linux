@@ -122,6 +122,11 @@ vasi_suspend_state_t return_invalid(struct papr_lpar_suspend_session *s)
 	return VASI_SUSPEND_STATE_INVALID;
 }
 
+vasi_suspend_state_t return_aborted(struct papr_lpar_suspend_session *s)
+{
+	return VASI_SUSPEND_STATE_ABORTED;
+}
+
 static void abort_on_vasi_state_invalid(struct kunit *t)
 {
 	const struct papr_suspend_ops ops = {
@@ -136,8 +141,23 @@ static void abort_on_vasi_state_invalid(struct kunit *t)
 	papr_lpar_suspend_session_finalize(s);
 }
 
+static void vasi_state_aborted(struct kunit *t)
+{
+	const struct papr_suspend_ops ops = {
+		.poll_vasi_state = return_aborted,
+	};
+	struct papr_lpar_suspend_session *s;
+
+	s = papr_lpar_suspend_session_new(TEST_VASI_STREAM_ID, &ops);
+
+	KUNIT_EXPECT_EQ(t, -ECANCELED, papr_suspend_lpar(s));
+
+	papr_lpar_suspend_session_finalize(s);
+}
+
 static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(abort_on_vasi_state_invalid),
+	KUNIT_CASE(vasi_state_aborted),
 	{},
 };
 
