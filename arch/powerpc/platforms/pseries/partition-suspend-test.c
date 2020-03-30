@@ -128,6 +128,16 @@ int papr_suspend_lpar(struct papr_lpar_suspend_session *session)
 
 #define TEST_VASI_STREAM_ID 0xabcdabcdabcdabcd
 
+/* VASI Suspend State Sequence paster macro */
+#define V3S(name, first_value, ...)			\
+	vasi_suspend_state_t name[] = {			\
+		[0] = (first_value),			\
+		##__VA_ARGS__,				\
+		VASI_SUSPEND_STATE_TEST_SEQ_END,	\
+	}
+
+static const V3S(invalid_at_start, VASI_SUSPEND_STATE_INVALID);
+
 vasi_suspend_state_t return_invalid(struct papr_lpar_suspend_session *s)
 {
 	return VASI_SUSPEND_STATE_INVALID;
