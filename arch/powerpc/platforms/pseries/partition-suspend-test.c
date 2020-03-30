@@ -136,13 +136,7 @@ static void abort_on_vasi_state_invalid(struct kunit *t)
 	papr_lpar_suspend_session_finalize(s);
 }
 
-static void this_should_fail(struct kunit *t)
-{
-	KUNIT_FAIL(t, "expected failure");
-}
-
 static struct kunit_case lpar_suspend_tests[] = {
-	KUNIT_CASE(this_should_fail),
 	KUNIT_CASE(abort_on_vasi_state_invalid),
 	{},
 };
