@@ -20,6 +20,12 @@
 
 static const V3S(invalid_at_start, VASI_SUSPEND_STATE_INVALID);
 
+struct suspend_test_context {
+	struct papr_lpar_suspend_session session;
+	const vasi_suspend_state_t *state_seq;
+	unsigned short state_seqno;
+};
+
 vasi_suspend_state_t return_invalid(struct papr_lpar_suspend_session *s)
 {
 	return VASI_SUSPEND_STATE_INVALID;
@@ -32,26 +38,26 @@ vasi_suspend_state_t return_aborted(struct papr_lpar_suspend_session *s)
 
 static void abort_on_vasi_state_invalid(struct kunit *t)
 {
+	struct suspend_test_context *ctx = t->priv;
 	const struct papr_suspend_ops ops = {
 		.poll_vasi_state = return_invalid,
 	};
-	struct papr_lpar_suspend_session s;
 
-	papr_suspend_session_init(&s, TEST_VASI_STREAM_ID, &ops);
+	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
 
-	KUNIT_EXPECT_EQ(t, -EINVAL, papr_suspend_lpar(&s));
+	KUNIT_EXPECT_EQ(t, -EINVAL, papr_suspend_lpar(&ctx->session));
 }
 
 static void vasi_state_aborted(struct kunit *t)
 {
+	struct suspend_test_context *ctx = t->priv;
 	const struct papr_suspend_ops ops = {
 		.poll_vasi_state = return_aborted,
 	};
-	struct papr_lpar_suspend_session s;
 
-	papr_suspend_session_init(&s, TEST_VASI_STREAM_ID, &ops);
+	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
 
-	KUNIT_EXPECT_EQ(t, -ECANCELED, papr_suspend_lpar(&s));
+	KUNIT_EXPECT_EQ(t, -ECANCELED, papr_suspend_lpar(&ctx->session));
 }
 
 static struct kunit_case lpar_suspend_tests[] = {
@@ -60,8 +66,21 @@ static struct kunit_case lpar_suspend_tests[] = {
 	{},
 };
 
+static int lpar_suspend_tsuite_init(struct kunit *t)
+{
+	struct suspend_test_context *ctx;
+
+	ctx = kunit_kzalloc(t, sizeof(*ctx), GFP_KERNEL);
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(t, ctx);
+
+	t->priv = ctx;
+
+	return 0;
+}
+
 static struct kunit_suite lpar_suspend_tsuite = {
 	.name = "pseries partition suspension",
+	.init = lpar_suspend_tsuite_init,
 	.test_cases = lpar_suspend_tests,
 };
 
