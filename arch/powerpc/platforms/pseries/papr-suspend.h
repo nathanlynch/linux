@@ -5,13 +5,21 @@
 
 /* All architected results for VASI state request. */
 typedef enum vasi_suspend_state {
-	VASI_SUSPEND_STATE_INVALID    = 0,
-	VASI_SUSPEND_STATE_ENABLED    = 1,
-	VASI_SUSPEND_STATE_ABORTED    = 2,
-	VASI_SUSPEND_STATE_SUSPENDING = 3,
+	/*
+	 * States which are observable from the suspending partition
+	 * using the H_VASI_STATE hcall.
+	 */
+	VASI_SUSPEND_STATE_INVALID    = 0, /* Invalid handle */
+	VASI_SUSPEND_STATE_ENABLED    = 1, /* Transfer in progress */
+	VASI_SUSPEND_STATE_ABORTED    = 2, /* Session aborted */
+	VASI_SUSPEND_STATE_SUSPENDING = 3, /* Ready for join+suspend-me */
+	VASI_SUSPEND_STATE_RESUMED    = 5, /* Now executing on destination */
+	VASI_SUSPEND_STATE_COMPLETED  = 6, /* Operation complete */
+	/*
+	 * States which are architected but should not be seen by the
+	 * suspending partition.
+	 */
 	VASI_SUSPEND_STATE_SUSPENDED  = 4,
-	VASI_SUSPEND_STATE_RESUMED    = 5,
-	VASI_SUSPEND_STATE_COMPLETED  = 6,
 	VASI_SUSPEND_STATE_FAILOVER   = 7,
 	/*
 	 * The following are for convenience and test. They are not
