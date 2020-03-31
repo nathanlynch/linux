@@ -21,6 +21,7 @@ static const vasi_suspend_state_t test_state_seq_end = VASI_SUSPEND_STATE_TEST_S
 		VASI_SUSPEND_STATE_TEST_SEQ_END,	\
 	}
 
+static const V3S(v3s_none, VASI_SUSPEND_STATE_TEST_SEQ_END);
 static const V3S(invalid_at_start, VASI_SUSPEND_STATE_INVALID);
 static const V3S(enabled_then_aborted,
 		 VASI_SUSPEND_STATE_ENABLED,
@@ -168,8 +169,10 @@ static int lpar_suspend_tsuite_init(struct kunit *t)
 		.cancel_suspend  = cancel_suspend_shouldnt_call,
 	};
 
-	t->priv = ctx;
 	ctx->test = t;
+	ctx->state_seq = v3s_none;
+
+	t->priv = ctx;
 
 	return 0;
 }
