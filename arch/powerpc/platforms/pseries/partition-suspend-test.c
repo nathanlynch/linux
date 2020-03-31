@@ -43,11 +43,6 @@ static vasi_suspend_state_t test_poll_vasi_state(struct papr_lpar_suspend_sessio
 	return ret;
 }
 
-vasi_suspend_state_t return_invalid(struct papr_lpar_suspend_session *s)
-{
-	return VASI_SUSPEND_STATE_INVALID;
-}
-
 vasi_suspend_state_t return_aborted(struct papr_lpar_suspend_session *s)
 {
 	return VASI_SUSPEND_STATE_ABORTED;
