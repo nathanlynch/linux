@@ -23,6 +23,7 @@ static const vasi_suspend_state_t test_state_seq_end = VASI_SUSPEND_STATE_TEST_S
 
 static const V3S(v3s_none, VASI_SUSPEND_STATE_TEST_SEQ_END);
 static const V3S(invalid_at_start, VASI_SUSPEND_STATE_INVALID);
+static const V3S(aborted_at_start, VASI_SUSPEND_STATE_ABORTED);
 static const V3S(enabled_then_aborted,
 		 VASI_SUSPEND_STATE_ENABLED,
 		 VASI_SUSPEND_STATE_ABORTED);
@@ -98,11 +99,6 @@ static void cancel_suspend_shouldnt_call(struct papr_lpar_suspend_session *s)
 	KUNIT_FAIL(ctx->test, "used cancel_suspend() callback in error");
 }
 
-vasi_suspend_state_t return_aborted(struct papr_lpar_suspend_session *s)
-{
-	return VASI_SUSPEND_STATE_ABORTED;
-}
-
 static void abort_on_vasi_state_invalid(struct kunit *t)
 {
 	struct suspend_test_context *ctx = t->priv;
@@ -149,8 +145,9 @@ static void vasi_state_aborted(struct kunit *t)
 {
 	struct suspend_test_context *ctx = t->priv;
 	const struct papr_suspend_ops ops = {
-		.poll_vasi_state = return_aborted,
+		.poll_vasi_state = test_poll_vasi_state,
 	};
+	ctx->state_seq = aborted_at_start;
 
 	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
 
