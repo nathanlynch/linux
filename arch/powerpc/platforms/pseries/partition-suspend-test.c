@@ -24,6 +24,7 @@ struct suspend_test_context {
 	struct papr_lpar_suspend_session session;
 	const vasi_suspend_state_t *state_seq;
 	unsigned short state_seqno;
+	struct kunit *test;
 };
 
 vasi_suspend_state_t return_invalid(struct papr_lpar_suspend_session *s)
@@ -74,6 +75,7 @@ static int lpar_suspend_tsuite_init(struct kunit *t)
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(t, ctx);
 
 	t->priv = ctx;
+	ctx->test = t;
 
 	return 0;
 }
