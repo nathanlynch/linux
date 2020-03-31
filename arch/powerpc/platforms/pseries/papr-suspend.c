@@ -13,27 +13,6 @@ void papr_suspend_session_init(struct papr_lpar_suspend_session *s, u64 handle,
 	};
 }
 
-struct papr_lpar_suspend_session *
-papr_lpar_suspend_session_new(u64 handle,
-			      const struct papr_suspend_ops *ops)
-{
-	struct papr_lpar_suspend_session *s;
-
-	s = kmalloc(sizeof(*s), GFP_KERNEL);
-	if (!s)
-		goto cancel;
-
-	papr_suspend_session_init(s, handle, ops);
-
-cancel:
-	return s;
-}
-
-void papr_lpar_suspend_session_finalize(struct papr_lpar_suspend_session *s)
-{
-	kfree(s);
-}
-
 int papr_suspend_lpar(struct papr_lpar_suspend_session *session)
 {
 	bool done;

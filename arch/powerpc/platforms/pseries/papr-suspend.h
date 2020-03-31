@@ -40,9 +40,4 @@ void papr_suspend_session_init(struct papr_lpar_suspend_session *s, u64 handle,
 
 int papr_suspend_lpar(struct papr_lpar_suspend_session *session);
 
-struct papr_lpar_suspend_session *
-papr_lpar_suspend_session_new(u64 handle,
-			      const struct papr_suspend_ops *ops);
-void papr_lpar_suspend_session_finalize(struct papr_lpar_suspend_session *s);
-
 #endif /* PAPR_SUSPEND_H */
