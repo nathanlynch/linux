@@ -84,7 +84,7 @@ static vasi_suspend_state_t poll_vasi_state_shouldnt_call(struct papr_lpar_suspe
 	return VASI_SUSPEND_STATE_INVALID;
 }
 
-void cancel_suspend_shouldnt_call(struct papr_lpar_suspend_session *s)
+static void cancel_suspend_shouldnt_call(struct papr_lpar_suspend_session *s)
 {
 	struct suspend_test_context *ctx;
 
