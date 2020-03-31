@@ -27,6 +27,22 @@ struct suspend_test_context {
 	struct kunit *test;
 };
 
+static vasi_suspend_state_t test_poll_vasi_state(struct papr_lpar_suspend_session *s)
+{
+	struct suspend_test_context *ctx;
+	vasi_suspend_state_t ret;
+
+	/* need reference to current struct kunit *t */
+	ctx = container_of(s, struct suspend_test_context, session);
+
+	/* catch bad test setup */
+	KUNIT_ASSERT_NOT_ERR_OR_NULL(ctx->test, ctx->state_seq);
+	ret = ctx->state_seq[ctx->state_seqno];
+	ctx->state_seqno++;
+
+	return ret;
+}
+
 vasi_suspend_state_t return_invalid(struct papr_lpar_suspend_session *s)
 {
 	return VASI_SUSPEND_STATE_INVALID;
@@ -41,8 +57,9 @@ static void abort_on_vasi_state_invalid(struct kunit *t)
 {
 	struct suspend_test_context *ctx = t->priv;
 	const struct papr_suspend_ops ops = {
-		.poll_vasi_state = return_invalid,
+		.poll_vasi_state = test_poll_vasi_state,
 	};
+	ctx->state_seq = invalid_at_start;
 
 	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
 
