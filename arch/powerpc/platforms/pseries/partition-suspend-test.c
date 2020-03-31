@@ -36,6 +36,7 @@ struct suspend_test_context {
 	const vasi_suspend_state_t *state_seq;
 	unsigned short state_seqno;
 	struct kunit *test;
+	struct papr_suspend_ops ops;
 };
 
 static vasi_suspend_state_t test_poll_vasi_state(struct papr_lpar_suspend_session *s)
@@ -72,6 +73,24 @@ static int do_suspend_shouldnt_call(struct papr_lpar_suspend_session *s)
 	return 0;
 }
 
+static vasi_suspend_state_t poll_vasi_state_shouldnt_call(struct papr_lpar_suspend_session *s)
+{
+	struct suspend_test_context *ctx;
+
+	ctx = container_of(s, struct suspend_test_context, session);
+	KUNIT_FAIL(ctx->test, "used poll_vasi_state() callback in error");
+
+	return VASI_SUSPEND_STATE_INVALID;
+}
+
+void cancel_suspend_shouldnt_call(struct papr_lpar_suspend_session *s)
+{
+	struct suspend_test_context *ctx;
+
+	ctx = container_of(s, struct suspend_test_context, session);
+	KUNIT_FAIL(ctx->test, "used cancel_suspend() callback in error");
+}
+
 vasi_suspend_state_t return_aborted(struct papr_lpar_suspend_session *s)
 {
 	return VASI_SUSPEND_STATE_ABORTED;
@@ -80,13 +99,11 @@ vasi_suspend_state_t return_aborted(struct papr_lpar_suspend_session *s)
 static void abort_on_vasi_state_invalid(struct kunit *t)
 {
 	struct suspend_test_context *ctx = t->priv;
-	const struct papr_suspend_ops ops = {
-		.poll_vasi_state = test_poll_vasi_state,
-		.do_suspend = do_suspend_shouldnt_call,
-	};
+
+	ctx->ops.poll_vasi_state = test_poll_vasi_state;
 	ctx->state_seq = invalid_at_start;
 
-	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
+	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ctx->ops);
 
 	KUNIT_EXPECT_EQ(t, -EINVAL, papr_suspend_lpar(&ctx->session));
 }
@@ -144,6 +161,12 @@ static int lpar_suspend_tsuite_init(struct kunit *t)
 
 	ctx = kunit_kzalloc(t, sizeof(*ctx), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(t, ctx);
+
+	ctx->ops = (struct papr_suspend_ops) {
+		.poll_vasi_state = poll_vasi_state_shouldnt_call,
+		.do_suspend      = do_suspend_shouldnt_call,
+		.cancel_suspend  = cancel_suspend_shouldnt_call,
+	};
 
 	t->priv = ctx;
 	ctx->test = t;
