@@ -10,6 +10,8 @@
 
 #define TEST_VASI_STREAM_ID 0xabcdabcdabcdabcd
 
+static const vasi_suspend_state_t test_state_seq_end = VASI_SUSPEND_STATE_TEST_SEQ_END;
+
 /* VASI Suspend State Sequence paster macro */
 #define V3S(name, first_value, ...)			\
 	vasi_suspend_state_t name[] = {			\
@@ -38,6 +40,7 @@ static vasi_suspend_state_t test_poll_vasi_state(struct papr_lpar_suspend_sessio
 	/* catch bad test setup */
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(ctx->test, ctx->state_seq);
 	ret = ctx->state_seq[ctx->state_seqno];
+	KUNIT_ASSERT_NE(ctx->test, ret, test_state_seq_end);
 	ctx->state_seqno++;
 
 	return ret;
