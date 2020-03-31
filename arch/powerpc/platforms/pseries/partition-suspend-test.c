@@ -32,11 +32,15 @@ static const V3S(happy_path,
 		 VASI_SUSPEND_STATE_SUSPENDING,
 		 VASI_SUSPEND_STATE_RESUMED,
 		 VASI_SUSPEND_STATE_COMPLETED);
+static const V3S(suspend_fails,
+		 VASI_SUSPEND_STATE_ENABLED,
+		 VASI_SUSPEND_STATE_SUSPENDING);
 
 struct suspend_test_context {
 	struct papr_lpar_suspend_session session;
 	const vasi_suspend_state_t *state_seq;
 	unsigned short state_seqno;
+	bool canceled;
 	struct kunit *test;
 	struct papr_suspend_ops ops;
 };
@@ -79,6 +83,11 @@ static int do_suspend_success(struct papr_lpar_suspend_session *s)
 	return 0;
 }
 
+static int do_suspend_enomem(struct papr_lpar_suspend_session *s)
+{
+	return -ENOMEM;
+}
+
 static int do_suspend_shouldnt_call(struct papr_lpar_suspend_session *s)
 {
 	struct suspend_test_context *ctx;
@@ -91,6 +100,16 @@ static int do_suspend_shouldnt_call(struct papr_lpar_suspend_session *s)
 
 /* papr_lpar_suspend_session->ops->cancel_suspend() test doubles */
 
+static void cancel_suspend(struct papr_lpar_suspend_session *s)
+{
+	struct suspend_test_context *ctx;
+
+	ctx = container_of(s, struct suspend_test_context, session);
+	ctx->canceled = true;
+
+	/* A real implementation would call H_VASI_SIGNAL(Cancel) */
+}
+
 static void cancel_suspend_shouldnt_call(struct papr_lpar_suspend_session *s)
 {
 	struct suspend_test_context *ctx;
@@ -98,6 +117,8 @@ static void cancel_suspend_shouldnt_call(struct papr_lpar_suspend_session *s)
 	ctx = container_of(s, struct suspend_test_context, session);
 	KUNIT_FAIL(ctx->test, "used cancel_suspend() callback in error");
 }
+
+/* Test cases */
 
 static void abort_on_vasi_state_invalid(struct kunit *t)
 {
@@ -155,11 +176,29 @@ static void vasi_state_aborted(struct kunit *t)
 	KUNIT_EXPECT_EQ(t, test_state_seq_end, ctx->state_seq[ctx->state_seqno]);
 }
 
+static void test_do_suspend_enomem(struct kunit *t)
+{
+	struct suspend_test_context *ctx = t->priv;
+	const struct papr_suspend_ops ops = {
+		.poll_vasi_state = test_poll_vasi_state,
+		.do_suspend = do_suspend_enomem,
+		.cancel_suspend = cancel_suspend,
+	};
+	ctx->state_seq = suspend_fails;
+
+	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
+
+	KUNIT_EXPECT_EQ(t, -ENOMEM, papr_suspend_lpar(&ctx->session));
+	KUNIT_EXPECT_EQ(t, test_state_seq_end, ctx->state_seq[ctx->state_seqno]);
+	KUNIT_EXPECT_TRUE(t, ctx->canceled);
+}
+
 static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(abort_on_vasi_state_invalid),
 	KUNIT_CASE(vasi_state_aborted),
 	KUNIT_CASE(test_enabled_then_aborted),
 	KUNIT_CASE(test_happy_path),
+	KUNIT_CASE(test_do_suspend_enomem),
 	{},
 };
 
