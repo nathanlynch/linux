@@ -107,6 +107,7 @@ static void abort_on_vasi_state_invalid(struct kunit *t)
 	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ctx->ops);
 
 	KUNIT_EXPECT_EQ(t, -EINVAL, papr_suspend_lpar(&ctx->session));
+	KUNIT_EXPECT_EQ(t, test_state_seq_end, ctx->state_seq[ctx->state_seqno]);
 }
 
 static void test_enabled_then_aborted(struct kunit *t)
@@ -120,6 +121,7 @@ static void test_enabled_then_aborted(struct kunit *t)
 	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
 
 	KUNIT_EXPECT_EQ(t, -ECANCELED, papr_suspend_lpar(&ctx->session));
+	KUNIT_EXPECT_EQ(t, test_state_seq_end, ctx->state_seq[ctx->state_seqno]);
 }
 
 static void test_happy_path(struct kunit *t)
@@ -134,6 +136,7 @@ static void test_happy_path(struct kunit *t)
 	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
 
 	KUNIT_EXPECT_EQ(t, 0, papr_suspend_lpar(&ctx->session));
+	KUNIT_EXPECT_EQ(t, test_state_seq_end, ctx->state_seq[ctx->state_seqno]);
 }
 
 static void vasi_state_aborted(struct kunit *t)
@@ -146,6 +149,7 @@ static void vasi_state_aborted(struct kunit *t)
 	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
 
 	KUNIT_EXPECT_EQ(t, -ECANCELED, papr_suspend_lpar(&ctx->session));
+	KUNIT_EXPECT_EQ(t, test_state_seq_end, ctx->state_seq[ctx->state_seqno]);
 }
 
 static struct kunit_case lpar_suspend_tests[] = {
