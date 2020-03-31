@@ -24,6 +24,11 @@ static const V3S(invalid_at_start, VASI_SUSPEND_STATE_INVALID);
 static const V3S(enabled_then_aborted,
 		 VASI_SUSPEND_STATE_ENABLED,
 		 VASI_SUSPEND_STATE_ABORTED);
+static const V3S(happy_path,
+		 VASI_SUSPEND_STATE_ENABLED,
+		 VASI_SUSPEND_STATE_SUSPENDING,
+		 VASI_SUSPEND_STATE_RESUMED,
+		 VASI_SUSPEND_STATE_COMPLETED);
 
 struct suspend_test_context {
 	struct papr_lpar_suspend_session session;
@@ -47,6 +52,11 @@ static vasi_suspend_state_t test_poll_vasi_state(struct papr_lpar_suspend_sessio
 	ctx->state_seqno++;
 
 	return ret;
+}
+
+static int do_suspend_success(struct papr_lpar_suspend_session *s)
+{
+	return 0;
 }
 
 static int do_suspend_shouldnt_call(struct papr_lpar_suspend_session *s)
@@ -91,6 +101,20 @@ static void test_enabled_then_aborted(struct kunit *t)
 	KUNIT_EXPECT_EQ(t, -ECANCELED, papr_suspend_lpar(&ctx->session));
 }
 
+static void test_happy_path(struct kunit *t)
+{
+	struct suspend_test_context *ctx = t->priv;
+	const struct papr_suspend_ops ops = {
+		.poll_vasi_state = test_poll_vasi_state,
+		.do_suspend = do_suspend_success,
+	};
+	ctx->state_seq = happy_path;
+
+	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
+
+	KUNIT_EXPECT_EQ(t, 0, papr_suspend_lpar(&ctx->session));
+}
+
 static void vasi_state_aborted(struct kunit *t)
 {
 	struct suspend_test_context *ctx = t->priv;
@@ -107,6 +131,7 @@ static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(abort_on_vasi_state_invalid),
 	KUNIT_CASE(vasi_state_aborted),
 	KUNIT_CASE(test_enabled_then_aborted),
+	KUNIT_CASE(test_happy_path),
 	{},
 };
 
