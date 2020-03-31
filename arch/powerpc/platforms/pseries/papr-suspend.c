@@ -25,9 +25,7 @@ papr_lpar_suspend_session_new(u64 handle,
 
 	papr_suspend_session_init(s, handle, ops);
 
-	return s;
 cancel:
-	ops->cancel_suspend(handle);
 	return s;
 }
 
@@ -61,7 +59,7 @@ int papr_suspend_lpar(struct papr_lpar_suspend_session *session)
 		case VASI_SUSPEND_STATE_SUSPENDING:
 			ret = session->ops->do_suspend(session);
 			if (ret) {
-				session->ops->cancel_suspend(session->handle);
+				session->ops->cancel_suspend(session);
 				done = true;
 			}
 			break;
