@@ -52,7 +52,6 @@ static vasi_suspend_state_t test_poll_vasi_state(struct papr_lpar_suspend_sessio
 	struct suspend_test_context *ctx;
 	vasi_suspend_state_t ret;
 
-	/* need reference to current struct kunit *t */
 	ctx = container_of(s, struct suspend_test_context, session);
 
 	/* catch bad test setup */
