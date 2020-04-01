@@ -90,11 +90,7 @@ static vasi_suspend_state_t poll_vasi_state_shouldnt_call(struct papr_lpar_suspe
 
 /* papr_lpar_suspend_session->ops->do_suspend() test doubles */
 
-/*
- * TODO: should_call+KUNIT_FAIL() here not necessary if testcases are
- * checking ctx->suspend_called?
-*/
-#define define_do_suspend_fn(fn_name, rc, should_call)			\
+#define define_do_suspend_fn(fn_name, rc)				\
 	static int fn_name(struct papr_lpar_suspend_session *s)		\
 	{								\
 		struct suspend_test_context *ctx;			\
@@ -104,16 +100,12 @@ static vasi_suspend_state_t poll_vasi_state_shouldnt_call(struct papr_lpar_suspe
 									\
 		ctx->suspend_called = true;				\
 									\
-		if (!should_call) {					\
-			KUNIT_FAIL(ctx->test,				\
-				   "used do_suspend() callback in error"); \
-		}							\
 		return (rc);						\
 	}
 
-define_do_suspend_fn(do_suspend_success, 0, true);
-define_do_suspend_fn(do_suspend_enomem, -ENOMEM, true);
-define_do_suspend_fn(do_suspend_shouldnt_call, 0, true);
+define_do_suspend_fn(do_suspend_success, 0);
+define_do_suspend_fn(do_suspend_enomem, -ENOMEM);
+define_do_suspend_fn(do_suspend_shouldnt_call, 0);
 
 /* papr_lpar_suspend_session->ops->cancel_suspend() test doubles */
 
