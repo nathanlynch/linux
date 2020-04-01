@@ -114,6 +114,39 @@ define_cancel_suspend_fn(cancel_suspend_shouldnt_call, false);
 
 /* Test cases */
 
+static void tc_inner(struct kunit *t,
+		     int (*do_suspend_fn)(struct papr_lpar_suspend_session *),
+		     void (*cancel_suspend_fn)(struct papr_lpar_suspend_session *),
+		     int expected_result,
+		     const vasi_suspend_state_t *vasi_states)
+{
+	struct suspend_test_context *ctx = t->priv;
+
+	ctx->ops.poll_vasi_state = test_poll_vasi_state;
+	if (do_suspend_fn != NULL)
+		ctx->ops.do_suspend = do_suspend_fn;
+	if (cancel_suspend_fn != NULL)
+		ctx->ops.cancel_suspend = cancel_suspend_fn;
+	ctx->state_seq = vasi_states;
+
+	papr_suspend_session_init(&ctx->session,
+				  TEST_VASI_STREAM_ID,
+				  &ctx->ops);
+
+	KUNIT_EXPECT_EQ(t, expected_result,
+			papr_suspend_lpar(&ctx->session));
+	KUNIT_EXPECT_EQ(t, test_state_seq_end,
+			ctx->state_seq[ctx->state_seqno]);
+	if (do_suspend_fn != NULL)
+		KUNIT_EXPECT_TRUE(t, ctx->suspend_called);
+	else
+		KUNIT_EXPECT_FALSE(t, ctx->suspend_called);
+	if (cancel_suspend_fn != NULL)
+		KUNIT_EXPECT_TRUE(t, ctx->canceled);
+	else
+		KUNIT_EXPECT_FALSE(t, ctx->canceled);
+}
+
 /**
  * TC() - Define a suspend testcase.
  *
@@ -138,31 +171,8 @@ define_cancel_suspend_fn(cancel_suspend_shouldnt_call, false);
 	static const V3S(vsl_ ## tcname, ##__VA_ARGS__);		\
 	static void tcname(struct kunit *t)				\
 	{								\
-		struct suspend_test_context *ctx = t->priv;		\
-									\
-		ctx->ops.poll_vasi_state = test_poll_vasi_state;	\
-		if (do_suspend_fn != NULL)				\
-			ctx->ops.do_suspend = do_suspend_fn;		\
-		if (cancel_suspend_fn != NULL)				\
-			ctx->ops.cancel_suspend = cancel_suspend_fn;	\
-		ctx->state_seq = vsl_ ## tcname;			\
-									\
-		papr_suspend_session_init(&ctx->session,		\
-					  TEST_VASI_STREAM_ID,		\
-					  &ctx->ops);			\
-									\
-		KUNIT_EXPECT_EQ(t, expected_result,			\
-				papr_suspend_lpar(&ctx->session));	\
-		KUNIT_EXPECT_EQ(t, test_state_seq_end,			\
-				ctx->state_seq[ctx->state_seqno]);	\
-		if (do_suspend_fn != NULL)				\
-			KUNIT_EXPECT_TRUE(t, ctx->suspend_called);	\
-		else							\
-			KUNIT_EXPECT_FALSE(t, ctx->suspend_called);	\
-		if (cancel_suspend_fn != NULL)				\
-			KUNIT_EXPECT_TRUE(t, ctx->canceled);		\
-		else							\
-			KUNIT_EXPECT_FALSE(t, ctx->canceled);		\
+		tc_inner(t, do_suspend_fn, cancel_suspend_fn,		\
+			 expected_result, vsl_ ## tcname);		\
 	}
 
 TC(handle_invalid,
