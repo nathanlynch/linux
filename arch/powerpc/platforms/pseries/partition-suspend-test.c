@@ -220,6 +220,9 @@ static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(test_happy_path),
 	KUNIT_CASE(test_do_suspend_enomem),
 	KUNIT_CASE(test_suspending_at_start),
+	/* TODO: test H_VASI_STATE -> H_Parameter */
+	/* TODO: test H_VASI_SIGNAL -> H_Parameter (cancel) */
+	/* TODO: test cancelling -> all vasi states */
 	{},
 };
 
