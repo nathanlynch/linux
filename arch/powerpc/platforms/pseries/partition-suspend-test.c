@@ -36,9 +36,6 @@ static const V3S(suspend_fails,
 		 VASI_SUSPEND_STATE_ENABLED,
 		 VASI_SUSPEND_STATE_SUSPENDING,
 		 VASI_SUSPEND_STATE_ABORTED);
-static const V3S(suspending_at_start,
-		 VASI_SUSPEND_STATE_SUSPENDING,
-		 VASI_SUSPEND_STATE_COMPLETED);
 
 typedef struct h_vasi_state_result {
 	long hvrc; /* H_Success, H_Parameter, H_Hardware */
@@ -214,23 +211,6 @@ static void test_do_suspend_enomem(struct kunit *t)
 	KUNIT_EXPECT_TRUE(t, ctx->canceled);
 }
 
-static void test_suspending_at_start(struct kunit *t)
-{
-	struct suspend_test_context *ctx = t->priv;
-	const struct papr_suspend_ops ops = {
-		.poll_vasi_state = test_poll_vasi_state,
-		.do_suspend = do_suspend_success,
-		.cancel_suspend = cancel_suspend_shouldnt_call,
-	};
-	ctx->state_seq = suspending_at_start;
-
-	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
-
-	KUNIT_EXPECT_EQ(t, 0, papr_suspend_lpar(&ctx->session));
-	KUNIT_EXPECT_EQ(t, test_state_seq_end, ctx->state_seq[ctx->state_seqno]);
-	KUNIT_EXPECT_FALSE(t, ctx->canceled);
-}
-
 /**
  * TC() - Define a suspend testcase.
  *
@@ -281,6 +261,13 @@ static void test_suspending_at_start(struct kunit *t)
 		else							\
 			KUNIT_EXPECT_FALSE(t, ctx->canceled);		\
 	}
+
+TC(test_suspending_at_start,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_COMPLETED);
 
 TC(happy_path_2,		  \
    do_suspend_success,		  \
