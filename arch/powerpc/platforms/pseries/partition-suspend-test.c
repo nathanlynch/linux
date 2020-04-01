@@ -137,19 +137,6 @@ define_cancel_suspend_fn(cancel_suspend_shouldnt_call, false);
 
 /* Test cases */
 
-static void abort_on_vasi_state_invalid(struct kunit *t)
-{
-	struct suspend_test_context *ctx = t->priv;
-
-	ctx->ops.poll_vasi_state = test_poll_vasi_state;
-	ctx->state_seq = invalid_at_start;
-
-	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ctx->ops);
-
-	KUNIT_EXPECT_EQ(t, -EINVAL, papr_suspend_lpar(&ctx->session));
-	KUNIT_EXPECT_EQ(t, test_state_seq_end, ctx->state_seq[ctx->state_seqno]);
-}
-
 /**
  * TC() - Define a suspend testcase.
  *
@@ -200,6 +187,12 @@ static void abort_on_vasi_state_invalid(struct kunit *t)
 		else							\
 			KUNIT_EXPECT_FALSE(t, ctx->canceled);		\
 	}
+
+TC(abort_on_vasi_state_invalid,
+   NULL,
+   NULL,
+   -EINVAL,
+   VASI_SUSPEND_STATE_INVALID);
 
 TC(test_enabled_then_aborted,
    NULL,
