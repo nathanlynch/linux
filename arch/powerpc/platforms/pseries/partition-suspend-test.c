@@ -121,23 +121,23 @@ define_do_suspend_fn(do_suspend_shouldnt_call, 0, true);
 
 /* papr_lpar_suspend_session->ops->cancel_suspend() test doubles */
 
-static void cancel_suspend(struct papr_lpar_suspend_session *s)
-{
-	struct suspend_test_context *ctx;
+#define define_cancel_suspend_fn(fn_name, should_call)			\
+	static void fn_name(struct papr_lpar_suspend_session *s)	\
+	{								\
+		struct suspend_test_context *ctx;			\
+									\
+		ctx = container_of(s, struct suspend_test_context,	\
+				   session);				\
+		ctx->canceled = true;					\
+									\
+		if (!should_call) {					\
+			KUNIT_FAIL(ctx->test,				\
+				   "used cancel_suspend() callback in error"); \
+		}							\
+	}
 
-	ctx = container_of(s, struct suspend_test_context, session);
-	ctx->canceled = true;
-
-	/* A real implementation would call H_VASI_SIGNAL(Cancel) */
-}
-
-static void cancel_suspend_shouldnt_call(struct papr_lpar_suspend_session *s)
-{
-	struct suspend_test_context *ctx;
-
-	ctx = container_of(s, struct suspend_test_context, session);
-	KUNIT_FAIL(ctx->test, "used cancel_suspend() callback in error");
-}
+define_cancel_suspend_fn(cancel_suspend_success, true);
+define_cancel_suspend_fn(cancel_suspend_shouldnt_call, false);
 
 /* Test cases */
 
@@ -203,7 +203,7 @@ static void test_do_suspend_enomem(struct kunit *t)
 	const struct papr_suspend_ops ops = {
 		.poll_vasi_state = test_poll_vasi_state,
 		.do_suspend = do_suspend_enomem,
-		.cancel_suspend = cancel_suspend,
+		.cancel_suspend = cancel_suspend_success,
 	};
 	ctx->state_seq = suspend_fails;
 
