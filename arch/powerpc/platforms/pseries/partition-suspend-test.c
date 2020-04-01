@@ -23,7 +23,6 @@ static const vasi_suspend_state_t test_state_seq_end = VASI_SUSPEND_STATE_TEST_S
 
 static const V3S(v3s_none, VASI_SUSPEND_STATE_TEST_SEQ_END);
 static const V3S(invalid_at_start, VASI_SUSPEND_STATE_INVALID);
-static const V3S(aborted_at_start, VASI_SUSPEND_STATE_ABORTED);
 static const V3S(enabled_then_aborted,
 		 VASI_SUSPEND_STATE_ENABLED,
 		 VASI_SUSPEND_STATE_ABORTED);
@@ -180,20 +179,6 @@ static void test_happy_path(struct kunit *t)
 	KUNIT_EXPECT_EQ(t, test_state_seq_end, ctx->state_seq[ctx->state_seqno]);
 }
 
-static void vasi_state_aborted(struct kunit *t)
-{
-	struct suspend_test_context *ctx = t->priv;
-	const struct papr_suspend_ops ops = {
-		.poll_vasi_state = test_poll_vasi_state,
-	};
-	ctx->state_seq = aborted_at_start;
-
-	papr_suspend_session_init(&ctx->session, TEST_VASI_STREAM_ID, &ops);
-
-	KUNIT_EXPECT_EQ(t, -ECANCELED, papr_suspend_lpar(&ctx->session));
-	KUNIT_EXPECT_EQ(t, test_state_seq_end, ctx->state_seq[ctx->state_seqno]);
-}
-
 /**
  * TC() - Define a suspend testcase.
  *
@@ -244,6 +229,12 @@ static void vasi_state_aborted(struct kunit *t)
 		else							\
 			KUNIT_EXPECT_FALSE(t, ctx->canceled);		\
 	}
+
+TC(vasi_state_aborted,
+   NULL,
+   NULL,
+   -ECANCELED,
+   VASI_SUSPEND_STATE_ABORTED);
 
 TC(test_do_suspend_enomem,
    do_suspend_enomem,
