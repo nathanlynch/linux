@@ -237,7 +237,6 @@ TC(happy_path_2,		  \
    0,				  \
    VASI_SUSPEND_STATE_ENABLED,	  \
    VASI_SUSPEND_STATE_SUSPENDING, \
-   VASI_SUSPEND_STATE_RESUMED,	  \
    VASI_SUSPEND_STATE_COMPLETED)
 
 static struct kunit_case lpar_suspend_tests[] = {
