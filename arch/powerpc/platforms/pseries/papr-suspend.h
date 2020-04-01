@@ -26,6 +26,7 @@ typedef enum vasi_suspend_state {
 	 * defined in PAPR or used outside of this code.
 	 */
 	VASI_SUSPEND_STATE_TEST_SEQ_END  = 9998,
+	VASI_SUSPEND_STATE_SENTINEL      = 9999,
 } vasi_suspend_state_t;
 
 /* Logical suspend operation states, distinct from VASI states. */
