@@ -188,20 +188,20 @@ define_cancel_suspend_fn(cancel_suspend_shouldnt_call, false);
 			KUNIT_EXPECT_FALSE(t, ctx->canceled);		\
 	}
 
-TC(abort_on_vasi_state_invalid,
+TC(handle_invalid,
    NULL,
    NULL,
    -EINVAL,
    VASI_SUSPEND_STATE_INVALID);
 
-TC(test_enabled_then_aborted,
+TC(handle_abort_after_enabled,
    NULL,
    NULL,
    -ECANCELED,
    VASI_SUSPEND_STATE_ENABLED,
    VASI_SUSPEND_STATE_ABORTED);
 
-TC(test_happy_path,
+TC(success_all_states,
    do_suspend_success,
    NULL,
    0,
@@ -210,13 +210,28 @@ TC(test_happy_path,
    VASI_SUSPEND_STATE_RESUMED,
    VASI_SUSPEND_STATE_COMPLETED);
 
-TC(vasi_state_aborted,
+TC(success_skip_resumed,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_COMPLETED);
+
+TC(success_fewest_states,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_COMPLETED);
+
+TC(handle_immediate_abort,
    NULL,
    NULL,
    -ECANCELED,
    VASI_SUSPEND_STATE_ABORTED);
 
-TC(test_do_suspend_enomem,
+TC(handle_enomem_from_suspend,
    do_suspend_enomem,
    cancel_suspend_success,
    -ENOMEM,
@@ -224,29 +239,14 @@ TC(test_do_suspend_enomem,
    VASI_SUSPEND_STATE_SUSPENDING,
    VASI_SUSPEND_STATE_ABORTED);
 
-TC(test_suspending_at_start,
-   do_suspend_success,
-   NULL,
-   0,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_COMPLETED);
-
-TC(happy_path_2,		  \
-   do_suspend_success,		  \
-   NULL,			  \
-   0,				  \
-   VASI_SUSPEND_STATE_ENABLED,	  \
-   VASI_SUSPEND_STATE_SUSPENDING, \
-   VASI_SUSPEND_STATE_COMPLETED)
-
 static struct kunit_case lpar_suspend_tests[] = {
-	KUNIT_CASE(abort_on_vasi_state_invalid),
-	KUNIT_CASE(vasi_state_aborted),
-	KUNIT_CASE(test_enabled_then_aborted),
-	KUNIT_CASE(test_happy_path),
-	KUNIT_CASE(test_do_suspend_enomem),
-	KUNIT_CASE(test_suspending_at_start),
-	KUNIT_CASE(happy_path_2),
+	KUNIT_CASE(handle_invalid),
+	KUNIT_CASE(handle_abort_after_enabled),
+	KUNIT_CASE(success_all_states),
+	KUNIT_CASE(success_skip_resumed),
+	KUNIT_CASE(success_fewest_states),
+	KUNIT_CASE(handle_immediate_abort),
+	KUNIT_CASE(handle_enomem_from_suspend),
 	/* TODO: test H_VASI_STATE -> H_Parameter */
 	/* TODO: test H_VASI_SIGNAL -> H_Parameter (cancel) */
 	/* TODO: test cancelling -> all vasi states */
