@@ -8,56 +8,105 @@ void papr_suspend_session_init(struct papr_lpar_suspend_session *s, u64 handle,
 {
 	*s = (struct papr_lpar_suspend_session) {
 		.handle = handle,
-		.state = VASI_SUSPEND_STATE_UNINITIALIZED,
+		.state = LPAR_SUSPEND_STARTING,
 		.ops = ops,
 	};
 }
 
-int papr_suspend_lpar(struct papr_lpar_suspend_session *session)
+static void step_state(struct papr_lpar_suspend_session *session, vasi_suspend_state_t vasi_state)
 {
-	bool done;
-	int ret;
-
-	done = false;
-	ret = 0;
-
-	while (!done) {
-		session->state = session->ops->poll_vasi_state(session);
-
-		switch (session->state) {
-		case VASI_SUSPEND_STATE_INVALID:
-			ret = -EINVAL;
-			done = true;
-			break;
+	switch (session->state) {
+	case LPAR_SUSPEND_STARTING:
+		switch(vasi_state) {
 		case VASI_SUSPEND_STATE_ENABLED:
-			break;
-		case VASI_SUSPEND_STATE_ABORTED:
-			ret = -ECANCELED;
-			done = true;
+			/* No change. */
 			break;
 		case VASI_SUSPEND_STATE_SUSPENDING:
-			ret = session->ops->do_suspend(session);
-			if (ret) {
+			session->result = session->ops->do_suspend(session);
+			session->state = LPAR_SUSPEND_RESUMING;
+			if (session->result) {
 				session->ops->cancel_suspend(session);
-				done = true;
+				/*
+				 * TODO: Should bail on H_Parameter et
+				 * al from H_VASI_SIGNAL. Doesn't make
+				 * sense to continue polling the VASI
+				 * state on error.
+				 */
+				session->state = LPAR_SUSPEND_CANCELING;
 			}
 			break;
-		case VASI_SUSPEND_STATE_SUSPENDED:
+		case VASI_SUSPEND_STATE_ABORTED:
+			session->result = -ECANCELED;
+			session->state = LPAR_SUSPEND_DONE;
 			break;
-		case VASI_SUSPEND_STATE_RESUMED:
-			break;
-		case VASI_SUSPEND_STATE_COMPLETED:
-			ret = 0;
-			done = true;
-			break;
-		case VASI_SUSPEND_STATE_FAILOVER:
+		case VASI_SUSPEND_STATE_INVALID:
+			session->result = -EINVAL;
+			session->state = LPAR_SUSPEND_DONE;
 			break;
 		default:
-			ret = -EIO;
-			done = true;
+			pr_err("Unexpected VASI migration session state %i "
+			       "while beginning suspend\n", vasi_state);
+			session->result = -EIO;
+			session->state = LPAR_SUSPEND_DONE;
 			break;
 		}
+		break;
+	case LPAR_SUSPEND_RESUMING:
+		switch(vasi_state) {
+		case VASI_SUSPEND_STATE_RESUMED:
+			/* No change. */
+			break;
+		case VASI_SUSPEND_STATE_COMPLETED:
+			session->state = LPAR_SUSPEND_DONE;
+			break;
+		default:
+			pr_err("Unexpected VASI migration session state %i "
+			       "while resuming\n", vasi_state);
+			session->state = LPAR_SUSPEND_DONE;
+			break;
+		}
+		break;
+	case LPAR_SUSPEND_CANCELING:
+		/*
+		 * If we're waiting for the platform to acknowledge
+		 * the cancellation, then session->result already has
+		 * the -errno and we don't set it here.
+		 */
+		switch(vasi_state) {
+		case VASI_SUSPEND_STATE_ENABLED:
+		case VASI_SUSPEND_STATE_SUSPENDING:
+			/* No change. */
+			break;
+		case VASI_SUSPEND_STATE_INVALID:
+		case VASI_SUSPEND_STATE_ABORTED:
+			session->state = LPAR_SUSPEND_DONE;
+			break;
+		default:
+			pr_err("Unexpected VASI migration session state %i "
+			       "while canceling\n", vasi_state);
+			session->state = LPAR_SUSPEND_DONE;
+			break;
+		}
+		break;
+	default:
+		pr_err("Unexpected LPAR suspend session state %i\n",
+		       session->state);
+		session->result = -EIO;
+		break;
+	}
+}
+
+int papr_suspend_lpar(struct papr_lpar_suspend_session *session)
+{
+	while (session->state != LPAR_SUSPEND_DONE) {
+		vasi_suspend_state_t vasi_state;
+
+		/* TODO: Handle H_Parameter et al from VASI state call. */
+		/* TODO: Make interruptible/killable. */
+		vasi_state = session->ops->poll_vasi_state(session);
+
+		step_state(session, vasi_state);
 	}
 
-	return ret;
+	return session->result;
 }

@@ -26,14 +26,22 @@ typedef enum vasi_suspend_state {
 	 * defined in PAPR or used outside of this code.
 	 */
 	VASI_SUSPEND_STATE_TEST_SEQ_END  = 9998,
-	VASI_SUSPEND_STATE_UNINITIALIZED = 9999,
 } vasi_suspend_state_t;
+
+/* Logical suspend operation states, distinct from VASI states. */
+typedef enum lpar_suspend_states {
+	LPAR_SUSPEND_STARTING,
+	LPAR_SUSPEND_RESUMING,
+	LPAR_SUSPEND_CANCELING,
+	LPAR_SUSPEND_DONE,
+} lp_suspend_state_t;
 
 struct papr_suspend_ops;
 
 struct papr_lpar_suspend_session {
 	u64 handle;
-	vasi_suspend_state_t state;
+	lp_suspend_state_t state;
+	int result;
 	const struct papr_suspend_ops *ops;
 };
 
