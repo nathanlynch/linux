@@ -245,15 +245,13 @@ static void test_suspending_at_start(struct kunit *t)
  *
  * @expected_result: Expected result of papr_suspend_lpar().
  *
- * @vasi_state_list: First result of ``&typedef h_vasi_state_result_t``
- *
  * @...: Variable-length list of ``&typedef h_vasi_state_result_t`` results.
  */
 #define TC(tcname,							\
 	   do_suspend_fn,						\
 	   cancel_suspend_fn,						\
 	   expected_result,						\
-	   vasi_state_list, ...)					\
+	   ...)								\
 	static const V3S(vsl_ ## tcname, ##__VA_ARGS__);		\
 	static void tcname(struct kunit *t)				\
 	{								\
