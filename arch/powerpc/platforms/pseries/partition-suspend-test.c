@@ -82,59 +82,6 @@ static vasi_suspend_state_t test_poll_vasi_state(struct papr_lpar_suspend_sessio
 	return ret;
 }
 
-/**
- * TC() - Define a suspend testcase.
- *
- * @name: Name of the testcase, to be passed to KUNIT_CASE()
- *
- * @do_suspend_fn: do_suspend() callback to use. Should be NULL if the
- *                 testcase is expected to not invoke a do_suspend() callback.
- *
- * @cancel_suspend_fn: cancel_suspend() callback to use. Should be NULL if the
- *                     testcase is expected to not invoke a @cancel_suspend
- *                     callback.
- *
- * @expected_result: Expected result of papr_suspend_lpar().
- *
- * @vasi_state_list: First result of ``&typedef h_vasi_state_result_t``
- *
- * @...: Variable-length list of ``&typedef h_vasi_state_result_t`` results.
- */
-#define TC(tcname,							\
-	   do_suspend_fn,						\
-	   cancel_suspend_fn,						\
-	   expected_result,						\
-	   vasi_state_list, ...)					\
-	static const V3S(vsl_ ## tcname, ##__VA_ARGS__);		\
-	static void tcname(struct kunit *t)				\
-	{								\
-		struct suspend_test_context *ctx = t->priv;		\
-									\
-		ctx->ops.poll_vasi_state = test_poll_vasi_state;	\
-		if (do_suspend_fn != NULL)				\
-			ctx->ops.do_suspend = do_suspend_fn;		\
-		if (cancel_suspend_fn != NULL)				\
-			ctx->ops.cancel_suspend = cancel_suspend_fn;	\
-		ctx->state_seq = vsl_ ## tcname;			\
-									\
-		papr_suspend_session_init(&ctx->session,		\
-					  TEST_VASI_STREAM_ID,		\
-					  &ctx->ops);			\
-									\
-		KUNIT_EXPECT_EQ(t, expected_result,			\
-				papr_suspend_lpar(&ctx->session));	\
-		KUNIT_EXPECT_EQ(t, test_state_seq_end,			\
-				ctx->state_seq[ctx->state_seqno]);	\
-		if (do_suspend_fn != NULL)				\
-			KUNIT_EXPECT_TRUE(t, ctx->suspend_called);	\
-		else							\
-			KUNIT_EXPECT_FALSE(t, ctx->suspend_called);	\
-		if (cancel_suspend_fn != NULL)				\
-			KUNIT_EXPECT_TRUE(t, ctx->canceled);		\
-		else							\
-			KUNIT_EXPECT_FALSE(t, ctx->canceled);		\
-	}
-
 static vasi_suspend_state_t poll_vasi_state_shouldnt_call(struct papr_lpar_suspend_session *s)
 {
 	struct suspend_test_context *ctx;
@@ -284,6 +231,59 @@ static void test_suspending_at_start(struct kunit *t)
 	KUNIT_EXPECT_EQ(t, test_state_seq_end, ctx->state_seq[ctx->state_seqno]);
 	KUNIT_EXPECT_FALSE(t, ctx->canceled);
 }
+
+/**
+ * TC() - Define a suspend testcase.
+ *
+ * @name: Name of the testcase, to be passed to KUNIT_CASE()
+ *
+ * @do_suspend_fn: do_suspend() callback to use. Should be NULL if the
+ *                 testcase is expected to not invoke a do_suspend() callback.
+ *
+ * @cancel_suspend_fn: cancel_suspend() callback to use. Should be NULL if the
+ *                     testcase is expected to not invoke a @cancel_suspend
+ *                     callback.
+ *
+ * @expected_result: Expected result of papr_suspend_lpar().
+ *
+ * @vasi_state_list: First result of ``&typedef h_vasi_state_result_t``
+ *
+ * @...: Variable-length list of ``&typedef h_vasi_state_result_t`` results.
+ */
+#define TC(tcname,							\
+	   do_suspend_fn,						\
+	   cancel_suspend_fn,						\
+	   expected_result,						\
+	   vasi_state_list, ...)					\
+	static const V3S(vsl_ ## tcname, ##__VA_ARGS__);		\
+	static void tcname(struct kunit *t)				\
+	{								\
+		struct suspend_test_context *ctx = t->priv;		\
+									\
+		ctx->ops.poll_vasi_state = test_poll_vasi_state;	\
+		if (do_suspend_fn != NULL)				\
+			ctx->ops.do_suspend = do_suspend_fn;		\
+		if (cancel_suspend_fn != NULL)				\
+			ctx->ops.cancel_suspend = cancel_suspend_fn;	\
+		ctx->state_seq = vsl_ ## tcname;			\
+									\
+		papr_suspend_session_init(&ctx->session,		\
+					  TEST_VASI_STREAM_ID,		\
+					  &ctx->ops);			\
+									\
+		KUNIT_EXPECT_EQ(t, expected_result,			\
+				papr_suspend_lpar(&ctx->session));	\
+		KUNIT_EXPECT_EQ(t, test_state_seq_end,			\
+				ctx->state_seq[ctx->state_seqno]);	\
+		if (do_suspend_fn != NULL)				\
+			KUNIT_EXPECT_TRUE(t, ctx->suspend_called);	\
+		else							\
+			KUNIT_EXPECT_FALSE(t, ctx->suspend_called);	\
+		if (cancel_suspend_fn != NULL)				\
+			KUNIT_EXPECT_TRUE(t, ctx->canceled);		\
+		else							\
+			KUNIT_EXPECT_FALSE(t, ctx->canceled);		\
+	}
 
 TC(happy_path_2,		  \
    do_suspend_success,		  \
