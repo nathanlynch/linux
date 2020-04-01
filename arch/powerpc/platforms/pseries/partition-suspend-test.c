@@ -176,12 +176,18 @@ static void tc_inner(struct kunit *t,
 			 expected_result, vsl_ ## tcname);		\
 	}
 
+/*
+ * Supplied handle is garbage/invalid.
+ */
 TC(handle_invalid,
    NULL,
    NULL,
    -EINVAL,
    VASI_SUSPEND_STATE_INVALID);
 
+/*
+ * Suspend is administratively aborted relatively early.
+ */
 TC(handle_abort_after_enabled,
    NULL,
    NULL,
@@ -189,6 +195,10 @@ TC(handle_abort_after_enabled,
    VASI_SUSPEND_STATE_ENABLED,
    VASI_SUSPEND_STATE_ABORTED);
 
+/*
+ * Suspend is administratively aborted after entering Suspending
+ * state, and/or e.g. ibm,suspend-me fails with -900x
+ */
 TC(handle_abort_after_suspending,
    do_suspend_ebusy,
    cancel_suspend_success,
@@ -197,6 +207,10 @@ TC(handle_abort_after_suspending,
    VASI_SUSPEND_STATE_SUSPENDING,
    VASI_SUSPEND_STATE_ABORTED);
 
+/*
+ * Each possible suspend state on the "happy path" is encountered
+ * once.
+ */
 TC(success_each_state_once,
    do_suspend_success,
    NULL,
@@ -206,6 +220,11 @@ TC(success_each_state_once,
    VASI_SUSPEND_STATE_RESUMED,
    VASI_SUSPEND_STATE_COMPLETED);
 
+/*
+ * Successful suspend where the VASI session state is Enabled for
+ * multiple polls before the platform is ready for the LPAR to
+ * suspend.
+ */
 TC(success_enabled_x10,
    do_suspend_success,
    NULL,
@@ -224,6 +243,10 @@ TC(success_enabled_x10,
    VASI_SUSPEND_STATE_RESUMED,
    VASI_SUSPEND_STATE_COMPLETED);
 
+/*
+ * Successful suspend where the VASI session state is Resumed for
+ * multiple polls before the platform says the operation is complete.
+ */
 TC(success_resumed_x10,
    do_suspend_success,
    NULL,
@@ -242,6 +265,10 @@ TC(success_resumed_x10,
    VASI_SUSPEND_STATE_RESUMED,
    VASI_SUSPEND_STATE_COMPLETED);
 
+/*
+ * Each possible suspend state (except Resumed) on the "happy path" is
+ * encountered once.
+ */
 TC(success_skip_resumed,
    do_suspend_success,
    NULL,
@@ -250,6 +277,10 @@ TC(success_skip_resumed,
    VASI_SUSPEND_STATE_SUSPENDING,
    VASI_SUSPEND_STATE_COMPLETED);
 
+/*
+ * Each possible suspend state (except Enabled) on the "happy path" is
+ * encountered once.
+ */
 TC(success_skip_enabled,
    do_suspend_success,
    NULL,
@@ -258,6 +289,10 @@ TC(success_skip_enabled,
    VASI_SUSPEND_STATE_RESUMED,
    VASI_SUSPEND_STATE_COMPLETED);
 
+/*
+ * The shortest possible suspend operation in terms of distinct VASI
+ * session states.
+ */
 TC(success_fewest_states,
    do_suspend_success,
    NULL,
@@ -265,12 +300,20 @@ TC(success_fewest_states,
    VASI_SUSPEND_STATE_SUSPENDING,
    VASI_SUSPEND_STATE_COMPLETED);
 
+/*
+ * Suspend is administratively aborted before H_VASI_STATE can return
+ * Enabled.
+ */
 TC(handle_immediate_abort,
    NULL,
    NULL,
    -ECANCELED,
    VASI_SUSPEND_STATE_ABORTED);
 
+/*
+ * Linux's suspend method encounters -ENOMEM and must ask the platform
+ * to cancel the suspend operation.
+ */
 TC(handle_enomem_from_suspend,
    do_suspend_enomem,
    cancel_suspend_success,
@@ -279,13 +322,22 @@ TC(handle_enomem_from_suspend,
    VASI_SUSPEND_STATE_SUSPENDING,
    VASI_SUSPEND_STATE_ABORTED);
 
+/*
+ * Below are weird conditions that probably shouldn't happen. The
+ * important thing is to verify that the suspend code doesn't get
+ * stuck waiting for a status transition that's never coming.
+ */
+
+/*
+ * Invalid VASI session state upon resuming. Nothing for Linux to do
+ * but log it and continue.
+ */
 TC(handle_invalid_after_resume,
    do_suspend_success,
    NULL,
    0,
    VASI_SUSPEND_STATE_SUSPENDING,
    VASI_SUSPEND_STATE_INVALID);
-
 
 static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(handle_invalid),
