@@ -90,6 +90,7 @@ static vasi_suspend_state_t poll_vasi_state_shouldnt_call(struct papr_lpar_suspe
 
 define_do_suspend_fn(do_suspend_success, 0);
 define_do_suspend_fn(do_suspend_enomem, -ENOMEM);
+define_do_suspend_fn(do_suspend_ebusy, -EBUSY);
 define_do_suspend_fn(do_suspend_shouldnt_call, 0);
 
 /* papr_lpar_suspend_session->ops->cancel_suspend() test doubles */
@@ -188,12 +189,56 @@ TC(handle_abort_after_enabled,
    VASI_SUSPEND_STATE_ENABLED,
    VASI_SUSPEND_STATE_ABORTED);
 
+TC(handle_abort_after_suspending,
+   do_suspend_ebusy,
+   cancel_suspend_success,
+   -EBUSY,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_ABORTED);
+
 TC(success_each_state_once,
    do_suspend_success,
    NULL,
    0,
    VASI_SUSPEND_STATE_ENABLED,
    VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_COMPLETED);
+
+TC(success_enabled_x10,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_COMPLETED);
+
+TC(success_resumed_x10,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_RESUMED,
    VASI_SUSPEND_STATE_RESUMED,
    VASI_SUSPEND_STATE_COMPLETED);
 
@@ -234,15 +279,27 @@ TC(handle_enomem_from_suspend,
    VASI_SUSPEND_STATE_SUSPENDING,
    VASI_SUSPEND_STATE_ABORTED);
 
+TC(handle_invalid_after_resume,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_INVALID);
+
+
 static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(handle_invalid),
 	KUNIT_CASE(handle_abort_after_enabled),
+	KUNIT_CASE(handle_abort_after_suspending),
 	KUNIT_CASE(success_each_state_once),
+	KUNIT_CASE(success_enabled_x10),
+	KUNIT_CASE(success_resumed_x10),
 	KUNIT_CASE(success_skip_resumed),
 	KUNIT_CASE(success_skip_enabled),
 	KUNIT_CASE(success_fewest_states),
 	KUNIT_CASE(handle_immediate_abort),
 	KUNIT_CASE(handle_enomem_from_suspend),
+	KUNIT_CASE(handle_invalid_after_resume),
 	/* TODO: test H_VASI_STATE -> H_Parameter */
 	/* TODO: test H_VASI_SIGNAL -> H_Parameter (cancel) */
 	/* TODO: test cancelling -> all vasi states */
