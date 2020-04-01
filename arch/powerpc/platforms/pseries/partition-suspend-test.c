@@ -218,6 +218,14 @@ TC(success_skip_resumed,
    VASI_SUSPEND_STATE_SUSPENDING,
    VASI_SUSPEND_STATE_COMPLETED);
 
+TC(success_skip_enabled,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_COMPLETED);
+
 TC(success_fewest_states,
    do_suspend_success,
    NULL,
@@ -244,6 +252,7 @@ static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(handle_abort_after_enabled),
 	KUNIT_CASE(success_all_states),
 	KUNIT_CASE(success_skip_resumed),
+	KUNIT_CASE(success_skip_enabled),
 	KUNIT_CASE(success_fewest_states),
 	KUNIT_CASE(handle_immediate_abort),
 	KUNIT_CASE(handle_enomem_from_suspend),
