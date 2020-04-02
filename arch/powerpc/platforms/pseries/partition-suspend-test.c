@@ -96,7 +96,7 @@ define_do_suspend_fn(do_suspend_shouldnt_call, 0);
 /* papr_lpar_suspend_session->ops->cancel_suspend() test doubles */
 
 #define define_cancel_suspend_fn(fn_name, should_call)			\
-	static void fn_name(struct papr_lpar_suspend_session *s)	\
+	static int fn_name(struct papr_lpar_suspend_session *s)	\
 	{								\
 		struct suspend_test_context *ctx;			\
 									\
@@ -108,6 +108,8 @@ define_do_suspend_fn(do_suspend_shouldnt_call, 0);
 			KUNIT_FAIL(ctx->test,				\
 				   "used cancel_suspend() callback in error"); \
 		}							\
+									\
+		return 0;						\
 	}
 
 define_cancel_suspend_fn(cancel_suspend_success, true);
@@ -117,7 +119,7 @@ define_cancel_suspend_fn(cancel_suspend_shouldnt_call, false);
 
 static void tc_inner(struct kunit *t,
 		     int (*do_suspend_fn)(struct papr_lpar_suspend_session *),
-		     void (*cancel_suspend_fn)(struct papr_lpar_suspend_session *),
+		     int (*cancel_suspend_fn)(struct papr_lpar_suspend_session *),
 		     int expected_result,
 		     const vasi_suspend_state_t *vasi_states)
 {
