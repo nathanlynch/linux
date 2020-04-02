@@ -113,6 +113,7 @@ define_do_suspend_fn(do_suspend_shouldnt_call, 0);
 	}
 
 define_cancel_suspend_fn(cancel_suspend_success, 0);
+define_cancel_suspend_fn(cancel_suspend_einval, -EINVAL);
 define_cancel_suspend_fn(cancel_suspend_shouldnt_call, 0);
 
 /* Test cases */
@@ -337,6 +338,20 @@ TC(handle_enomem_from_suspend,
    VASI_SUSPEND_STATE_ABORTED);
 
 /*
+ * Linux's suspend method encounters -ENOMEM and must ask the platform
+ * to cancel the suspend operation. Concurrently, the suspend
+ * operation is administratively aborted, causing H_VASI_SIGNAL to
+ * return an error. In this case Linux should not wait for a
+ * transition to the Aborted or Invalid VASI session state.
+ */
+TC(handle_enomem_from_suspend_and_einval_from_cancel,
+   do_suspend_enomem,
+   cancel_suspend_einval,
+   -ENOMEM,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_SUSPENDING);
+
+/*
  * Below are weird conditions that probably shouldn't happen unless
  * there are firmware bugs. The important thing is to verify that the
  * suspend code doesn't get stuck waiting for a status transition
@@ -376,8 +391,8 @@ static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(handle_enomem_from_suspend),
 	KUNIT_CASE(handle_invalid_after_resume),
 	KUNIT_CASE(handle_resumed_after_enabled),
+	KUNIT_CASE(handle_enomem_from_suspend_and_einval_from_cancel),
 	/* TODO: test H_VASI_STATE -> H_Parameter */
-	/* TODO: test H_VASI_SIGNAL -> H_Parameter (cancel) */
 	/* TODO: test cancelling -> all vasi states */
 	{},
 };
