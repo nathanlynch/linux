@@ -95,8 +95,8 @@ define_do_suspend_fn(do_suspend_shouldnt_call, 0);
 
 /* papr_lpar_suspend_session->ops->cancel_suspend() test doubles */
 
-#define define_cancel_suspend_fn(fn_name, should_call)			\
-	static int fn_name(struct papr_lpar_suspend_session *s)	\
+#define define_cancel_suspend_fn(fn_name)				\
+	static int fn_name(struct papr_lpar_suspend_session *s)		\
 	{								\
 		struct suspend_test_context *ctx;			\
 									\
@@ -104,16 +104,11 @@ define_do_suspend_fn(do_suspend_shouldnt_call, 0);
 				   session);				\
 		ctx->canceled = true;					\
 									\
-		if (!should_call) {					\
-			KUNIT_FAIL(ctx->test,				\
-				   "used cancel_suspend() callback in error"); \
-		}							\
-									\
 		return 0;						\
 	}
 
-define_cancel_suspend_fn(cancel_suspend_success, true);
-define_cancel_suspend_fn(cancel_suspend_shouldnt_call, false);
+define_cancel_suspend_fn(cancel_suspend_success);
+define_cancel_suspend_fn(cancel_suspend_shouldnt_call);
 
 /* Test cases */
 
