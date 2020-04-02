@@ -97,7 +97,7 @@ define_do_suspend_fn(do_suspend_shouldnt_call, 0);
 
 /* papr_lpar_suspend_session->ops->cancel_suspend() test doubles */
 
-#define define_cancel_suspend_fn(fn_name)				\
+#define define_cancel_suspend_fn(fn_name, rc)				\
 	static int fn_name(struct papr_lpar_suspend_session *s)		\
 	{								\
 		struct suspend_test_context *ctx;			\
@@ -109,11 +109,11 @@ define_do_suspend_fn(do_suspend_shouldnt_call, 0);
 		KUNIT_EXPECT_FALSE(ctx->test, ctx->canceled);		\
 		ctx->canceled = true;					\
 									\
-		return 0;						\
+		return (rc);						\
 	}
 
-define_cancel_suspend_fn(cancel_suspend_success);
-define_cancel_suspend_fn(cancel_suspend_shouldnt_call);
+define_cancel_suspend_fn(cancel_suspend_success, 0);
+define_cancel_suspend_fn(cancel_suspend_shouldnt_call, 0);
 
 /* Test cases */
 
