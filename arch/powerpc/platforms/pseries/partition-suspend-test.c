@@ -179,10 +179,22 @@ static void tc_inner(struct kunit *t,
 /*
  * Supplied handle is garbage/invalid.
  */
-TC(handle_invalid,
+TC(handle_immediate_invalid,
    NULL,
    NULL,
    -EINVAL,
+   VASI_SUSPEND_STATE_INVALID);
+
+/*
+ * Supplied handle is invalidated after entering Suspending state,
+ * and/or e.g. ibm,suspend-me fails with -900x.
+ */
+TC(handle_invalid_after_suspending,
+   do_suspend_ebusy,
+   cancel_suspend_success,
+   -EBUSY,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_SUSPENDING,
    VASI_SUSPEND_STATE_INVALID);
 
 /*
@@ -339,8 +351,16 @@ TC(handle_invalid_after_resume,
    VASI_SUSPEND_STATE_SUSPENDING,
    VASI_SUSPEND_STATE_INVALID);
 
+TC(handle_resumed_after_enabled,
+   NULL,
+   NULL,
+   -EIO,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_RESUMED);
+
 static struct kunit_case lpar_suspend_tests[] = {
-	KUNIT_CASE(handle_invalid),
+	KUNIT_CASE(handle_immediate_invalid),
+	KUNIT_CASE(handle_invalid_after_suspending),
 	KUNIT_CASE(handle_abort_after_enabled),
 	KUNIT_CASE(handle_abort_after_suspending),
 	KUNIT_CASE(success_each_state_once),
@@ -352,6 +372,7 @@ static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(handle_immediate_abort),
 	KUNIT_CASE(handle_enomem_from_suspend),
 	KUNIT_CASE(handle_invalid_after_resume),
+	KUNIT_CASE(handle_resumed_after_enabled),
 	/* TODO: test H_VASI_STATE -> H_Parameter */
 	/* TODO: test H_VASI_SIGNAL -> H_Parameter (cancel) */
 	/* TODO: test cancelling -> all vasi states */
