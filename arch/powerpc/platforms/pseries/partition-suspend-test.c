@@ -335,9 +335,10 @@ TC(handle_enomem_from_suspend,
    VASI_SUSPEND_STATE_ABORTED);
 
 /*
- * Below are weird conditions that probably shouldn't happen. The
- * important thing is to verify that the suspend code doesn't get
- * stuck waiting for a status transition that's never coming.
+ * Below are weird conditions that probably shouldn't happen unless
+ * there are firmware bugs. The important thing is to verify that the
+ * suspend code doesn't get stuck waiting for a status transition
+ * that's never coming.
  */
 
 /*
