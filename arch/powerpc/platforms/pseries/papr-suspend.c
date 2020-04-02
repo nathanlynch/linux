@@ -26,6 +26,9 @@ static void step_state(struct papr_lpar_suspend_session *session, vasi_suspend_s
 			session->state = LPAR_SUSPEND_RESUMING;
 			if (session->result) {
 				session->ops->cancel_suspend(session);
+				pr_err("partition suspend error %i; "
+				       "attempting to cancel", session->result);
+
 				/*
 				 * TODO: Should bail on H_Parameter et
 				 * al from H_VASI_SIGNAL. Doesn't make
