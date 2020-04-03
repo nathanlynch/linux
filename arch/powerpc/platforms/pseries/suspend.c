@@ -16,73 +16,7 @@
 #include "papr-suspend.h"
 #include "../../kernel/cacheinfo.h"
 
-static u64 stream_id;
 static struct device suspend_dev;
-static DECLARE_COMPLETION(suspend_work);
-static struct rtas_suspend_me_data suspend_data;
-static atomic_t suspending;
-
-/**
- * pseries_suspend_begin - First phase of hibernation
- *
- * Check to ensure we are in a valid state to hibernate
- *
- * Return value:
- * 	0 on success / other on failure
- **/
-static int pseries_suspend_begin(suspend_state_t state)
-{
-	long vasi_state, rc;
-	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
-
-	/* Make sure the state is valid */
-	rc = plpar_hcall(H_VASI_STATE, retbuf, stream_id);
-
-	vasi_state = retbuf[0];
-
-	if (rc) {
-		pr_err("pseries_suspend_begin: vasi_state returned %ld\n",rc);
-		return rc;
-	} else if (vasi_state == H_VASI_ENABLED) {
-		return -EAGAIN;
-	} else if (vasi_state != H_VASI_SUSPENDING) {
-		pr_err("pseries_suspend_begin: vasi_state returned state %ld\n",
-		       vasi_state);
-		return -EIO;
-	}
-
-	return 0;
-}
-
-/**
- * pseries_suspend_cpu - Suspend a single CPU
- *
- * Makes the H_JOIN call to suspend the CPU
- *
- **/
-static int pseries_suspend_cpu(void)
-{
-	if (atomic_read(&suspending))
-		return rtas_suspend_cpu(&suspend_data);
-	return 0;
-}
-
-/**
- * pseries_suspend_enable_irqs
- *
- * Post suspend configuration updates
- *
- **/
-static void pseries_suspend_enable_irqs(void)
-{
-	/*
-	 * Update configuration which can be modified based on device tree
-	 * changes during resume.
-	 */
-	cacheinfo_cpu_offline(smp_processor_id());
-	post_mobility_fixup();
-	cacheinfo_cpu_online(smp_processor_id());
-}
 
 /**
  * pseries_suspend_enter - Final phase of hibernation
@@ -92,28 +26,30 @@ static void pseries_suspend_enable_irqs(void)
  **/
 static int pseries_suspend_enter(suspend_state_t state)
 {
-	int rc = rtas_suspend_last_cpu(&suspend_data);
+	int fwrc;
+	int ret;
 
-	atomic_set(&suspending, 0);
-	atomic_set(&suspend_data.done, 1);
-	return rc;
-}
+	fwrc = rtas_call(rtas_token("ibm,suspend-me"), 0, 1, NULL);
+	if (fwrc)
+		pr_err("ibm,suspend-me failed with %i\n", fwrc);
+	switch (fwrc) {
+	case 0:
+		ret = 0;
+		break;
+	case 9000: /* Suspension aborted */
+		ret = -ECANCELED;
+		break;
+	case -9004:
+	case -9005:
+	case -9006:
+		ret = -EBUSY;
+		break;
+	case -1: /* hw error */
+	default:
+		ret = -EIO;
+	}
 
-/**
- * pseries_prepare_late - Prepare to suspend all other CPUs
- *
- * Return value:
- * 	0 on success / other on failure
- **/
-static int pseries_prepare_late(void)
-{
-	atomic_set(&suspending, 1);
-	atomic_set(&suspend_data.working, 0);
-	atomic_set(&suspend_data.done, 0);
-	atomic_set(&suspend_data.error, 0);
-	suspend_data.complete = &suspend_work;
-	reinit_completion(&suspend_work);
-	return 0;
+	return ret;
 }
 
 /* for qemu testing */
@@ -126,7 +62,7 @@ static int fake_poll_vasi_state(struct papr_lpar_suspend_session *session,
 
 static int do_suspend(struct papr_lpar_suspend_session *session)
 {
-	return -EIO;
+	return pm_suspend(PM_SUSPEND_MEM);
 }
 
 static int fake_cancel_suspend(struct papr_lpar_suspend_session *session)
@@ -210,8 +146,6 @@ static struct bus_type suspend_subsys = {
 
 static const struct platform_suspend_ops pseries_suspend_ops = {
 	.valid		= suspend_valid_only_mem,
-	.begin		= pseries_suspend_begin,
-	.prepare_late	= pseries_prepare_late,
 	.enter		= pseries_suspend_enter,
 };
 
@@ -254,15 +188,9 @@ static int __init pseries_suspend_init(void)
 	if (!firmware_has_feature(FW_FEATURE_LPAR))
 		return 0;
 
-	suspend_data.token = rtas_token("ibm,suspend-me");
-	if (suspend_data.token == RTAS_UNKNOWN_SERVICE)
-		return 0;
-
 	if ((rc = pseries_suspend_sysfs_register(&suspend_dev)))
 		return rc;
 
-	ppc_md.suspend_disable_cpu = pseries_suspend_cpu;
-	ppc_md.suspend_enable_irqs = pseries_suspend_enable_irqs;
 	suspend_set_ops(&pseries_suspend_ops);
 	return 0;
 }
