@@ -105,10 +105,16 @@ int papr_suspend_lpar(struct papr_lpar_suspend_session *session)
 {
 	while (session->state != LPAR_SUSPEND_DONE) {
 		vasi_suspend_state_t vasi_state;
+		int err;
 
-		/* TODO: Handle H_Parameter et al from VASI state call. */
 		/* TODO: Make interruptible/killable. */
-		session->ops->poll_vasi_state(session, &vasi_state);
+		err = session->ops->poll_vasi_state(session, &vasi_state);
+		if (err) {
+			pr_err("H_VASI_STATE(0x%llx) unexpectedly returned %i",
+			       session->handle, err);
+			session->result = err;
+			break;
+		}
 
 		step_state(session, vasi_state);
 	}
