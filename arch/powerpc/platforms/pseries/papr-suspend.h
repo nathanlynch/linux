@@ -40,6 +40,7 @@ typedef enum lpar_suspend_states {
 struct papr_suspend_ops;
 
 struct papr_lpar_suspend_session {
+/* private: All fields for internal use. */
 	u64 handle;
 	lp_suspend_state_t state;
 	int result;
