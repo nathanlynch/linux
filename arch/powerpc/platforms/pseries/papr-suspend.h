@@ -47,7 +47,8 @@ struct papr_lpar_suspend_session {
 };
 
 struct papr_suspend_ops {
-	vasi_suspend_state_t (*poll_vasi_state)(struct papr_lpar_suspend_session *s);
+	int (*poll_vasi_state)(struct papr_lpar_suspend_session *session,
+			       vasi_suspend_state_t *state);
 	int (*do_suspend)(struct papr_lpar_suspend_session *s);
 	int (*cancel_suspend)(struct papr_lpar_suspend_session *s);
 };

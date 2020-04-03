@@ -108,7 +108,7 @@ int papr_suspend_lpar(struct papr_lpar_suspend_session *session)
 
 		/* TODO: Handle H_Parameter et al from VASI state call. */
 		/* TODO: Make interruptible/killable. */
-		vasi_state = session->ops->poll_vasi_state(session);
+		session->ops->poll_vasi_state(session, &vasi_state);
 
 		step_state(session, vasi_state);
 	}

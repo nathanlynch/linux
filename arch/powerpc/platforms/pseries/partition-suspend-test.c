@@ -45,32 +45,33 @@ struct suspend_test_context {
 
 /* papr_lpar_suspend_session->ops->poll_vasi_state() test doubles */
 
-static vasi_suspend_state_t test_poll_vasi_state(struct papr_lpar_suspend_session *s)
+static int test_poll_vasi_state(struct papr_lpar_suspend_session *s,
+				vasi_suspend_state_t *state)
 {
 	struct suspend_test_context *ctx;
-	vasi_suspend_state_t ret;
 
 	ctx = container_of(s, struct suspend_test_context, session);
 
 	/* catch bad test setup */
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(ctx->test, ctx->state_seq);
-	ret = ctx->state_seq[ctx->state_seqno];
+	*state = ctx->state_seq[ctx->state_seqno];
 
 	/* catch state sequence overrun */
-	KUNIT_ASSERT_NE(ctx->test, ret, test_state_seq_end);
+	KUNIT_ASSERT_NE(ctx->test, *state, test_state_seq_end);
 	ctx->state_seqno++;
 
-	return ret;
+	return 0;
 }
 
-static vasi_suspend_state_t poll_vasi_state_shouldnt_call(struct papr_lpar_suspend_session *s)
+static int poll_vasi_state_shouldnt_call(struct papr_lpar_suspend_session *s,
+					 vasi_suspend_state_t *state)
 {
 	struct suspend_test_context *ctx;
 
 	ctx = container_of(s, struct suspend_test_context, session);
 	KUNIT_FAIL(ctx->test, "used poll_vasi_state() callback in error");
 
-	return VASI_SUSPEND_STATE_INVALID;
+	return -EIO;
 }
 
 /* papr_lpar_suspend_session->ops->do_suspend() test doubles */
