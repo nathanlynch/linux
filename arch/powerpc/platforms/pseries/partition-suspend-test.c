@@ -14,11 +14,11 @@
 static const vasi_suspend_state_t test_state_seq_end = VASI_SUSPEND_STATE_TEST_SEQ_END;
 
 /* VASI Suspend State Sequence paster macro */
-#define V3S(name, first_value, ...)			\
-	vasi_suspend_state_t name[] = {			\
-		[0] = (first_value),			\
-		##__VA_ARGS__,				\
-		VASI_SUSPEND_STATE_TEST_SEQ_END,	\
+#define V3S(name, first_value, ...)					\
+	h_vasi_state_result_t name[] = {				\
+		(first_value),						\
+		##__VA_ARGS__,						\
+		h_vasi_state__h_success(VASI_SUSPEND_STATE_TEST_SEQ_END), \
 	}
 
 typedef struct h_vasi_state_result {
@@ -26,16 +26,16 @@ typedef struct h_vasi_state_result {
 	vasi_suspend_state_t r4;
 } h_vasi_state_result_t;
 
-#define define_vasi_state_result(rc, ret) \
-	(struct h_vasi_state_result) { .hvrc = (rc), .r4 = (ret), }
-#define vasi_state_success(ret) \
-	define_vasi_state_result(H_SUCCESS, (ret))
-#define vasi_state_error(err) \
-	define_vasi_state_result((err), VASI_SUSPEND_STATE_SENTINEL)
+#define define_vasi_state_result(__rc, __state) \
+	(h_vasi_state_result_t){ .hvrc = (__rc), .r4 = (__state), }
+#define h_vasi_state__h_success(__state) \
+	define_vasi_state_result(H_SUCCESS, (__state))
+#define h_vasi_state__err(hvrc) \
+	define_vasi_state_result((hvrc), VASI_SUSPEND_STATE_SENTINEL)
 
 struct suspend_test_context {
 	struct papr_lpar_suspend_session session;
-	const vasi_suspend_state_t *state_seq;
+	const h_vasi_state_result_t *state_seq;
 	unsigned short state_seqno;
 	bool suspend_called;
 	bool canceled;
@@ -49,18 +49,33 @@ static int test_poll_vasi_state(struct papr_lpar_suspend_session *s,
 				vasi_suspend_state_t *state)
 {
 	struct suspend_test_context *ctx;
+	h_vasi_state_result_t res;
+	int ret;
 
 	ctx = container_of(s, struct suspend_test_context, session);
 
 	/* catch bad test setup */
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(ctx->test, ctx->state_seq);
-	*state = ctx->state_seq[ctx->state_seqno];
+	res = ctx->state_seq[ctx->state_seqno];
 
 	/* catch state sequence overrun */
-	KUNIT_ASSERT_NE(ctx->test, *state, test_state_seq_end);
+	KUNIT_ASSERT_NE(ctx->test, res.r4, test_state_seq_end);
 	ctx->state_seqno++;
 
-	return 0;
+	*state = res.r4;
+
+	switch (res.hvrc) {
+	case H_PARAMETER:
+		ret = -EINVAL;
+		break;
+	case H_HARDWARE:
+		ret = -EIO;
+		break;
+	default:
+		ret = 0;
+		break;
+	}
+	return ret;
 }
 
 static int poll_vasi_state_shouldnt_call(struct papr_lpar_suspend_session *s,
@@ -123,7 +138,7 @@ static void tc_inner(struct kunit *t,
 		     int (*do_suspend_fn)(struct papr_lpar_suspend_session *),
 		     int (*cancel_suspend_fn)(struct papr_lpar_suspend_session *),
 		     int expected_result,
-		     const vasi_suspend_state_t *vasi_states)
+		     const h_vasi_state_result_t *vasi_states)
 {
 	struct suspend_test_context *ctx = t->priv;
 
@@ -141,7 +156,7 @@ static void tc_inner(struct kunit *t,
 	KUNIT_EXPECT_EQ(t, expected_result,
 			papr_suspend_lpar(&ctx->session));
 	KUNIT_EXPECT_EQ(t, test_state_seq_end,
-			ctx->state_seq[ctx->state_seqno]);
+			ctx->state_seq[ctx->state_seqno].r4);
 	if (do_suspend_fn != NULL)
 		KUNIT_EXPECT_TRUE(t, ctx->suspend_called);
 	else
@@ -187,7 +202,7 @@ TC(handle_immediate_invalid,
    NULL,
    NULL,
    -EINVAL,
-   VASI_SUSPEND_STATE_INVALID);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
 /*
  * Supplied handle is invalidated after entering Suspending state,
@@ -197,9 +212,9 @@ TC(handle_invalid_after_suspending,
    do_suspend_ebusy,
    cancel_suspend_success,
    -EBUSY,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_INVALID);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
 /*
  * Suspend is administratively aborted relatively early.
@@ -208,8 +223,8 @@ TC(handle_abort_after_enabled,
    NULL,
    NULL,
    -ECANCELED,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_ABORTED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
 
 /*
  * Suspend is administratively aborted after entering Suspending
@@ -219,9 +234,9 @@ TC(handle_abort_after_suspending,
    do_suspend_ebusy,
    cancel_suspend_success,
    -EBUSY,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_ABORTED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
 
 /*
  * Each possible suspend state on the "happy path" is encountered
@@ -231,10 +246,10 @@ TC(success_each_state_once,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_COMPLETED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
 
 /*
  * Successful suspend where the VASI session state is Enabled for
@@ -245,19 +260,19 @@ TC(success_enabled_x10,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_COMPLETED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
 
 /*
  * Successful suspend where the VASI session state is Resumed for
@@ -267,19 +282,19 @@ TC(success_resumed_x10,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_COMPLETED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
 
 /*
  * Each possible suspend state (except Resumed) on the "happy path" is
@@ -289,9 +304,9 @@ TC(success_skip_resumed,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_COMPLETED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
 
 /*
  * Each possible suspend state (except Enabled) on the "happy path" is
@@ -301,9 +316,9 @@ TC(success_skip_enabled,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_COMPLETED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
 
 /*
  * The shortest possible suspend operation in terms of distinct VASI
@@ -313,8 +328,8 @@ TC(success_fewest_states,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_COMPLETED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
 
 /*
  * Suspend is administratively aborted before H_VASI_STATE can return
@@ -324,7 +339,7 @@ TC(handle_immediate_abort,
    NULL,
    NULL,
    -ECANCELED,
-   VASI_SUSPEND_STATE_ABORTED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
 
 /*
  * Linux's suspend method encounters -ENOMEM and must ask the platform
@@ -334,9 +349,9 @@ TC(handle_enomem_from_suspend,
    do_suspend_enomem,
    cancel_suspend_success,
    -ENOMEM,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_ABORTED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
 
 /*
  * Linux's suspend method encounters -ENOMEM and must ask the platform
@@ -349,8 +364,8 @@ TC(handle_enomem_from_suspend_and_einval_from_cancel,
    do_suspend_enomem,
    cancel_suspend_einval,
    -ENOMEM,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING));
 
 /*
  * Below are weird conditions that probably shouldn't happen unless
@@ -367,21 +382,21 @@ TC(handle_invalid_after_resume,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_INVALID);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
 TC(handle_resumed_after_enabled,
    NULL,
    NULL,
    -EIO,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_RESUMED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED));
 
 TC(generated__aborted,
    NULL,
    NULL,
    -ECANCELED,
-   VASI_SUSPEND_STATE_ABORTED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
 
 /* Paths beginning with enabled */
 
@@ -389,57 +404,57 @@ TC(generated__enabled_aborted,
    NULL,
    NULL,
    -ECANCELED,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_ABORTED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
 
 TC(generated__enabled_invalid,
    NULL,
    NULL,
    -EINVAL,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_INVALID);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
 TC(generated__enabled_suspending_aborted,
    do_suspend_ebusy,
    cancel_suspend_success,
    -EBUSY,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_ABORTED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
 
 TC(generated__enabled_suspending_completed,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_COMPLETED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
 
 TC(generated__enabled_suspending_invalid,
    do_suspend_ebusy,
    cancel_suspend_success,
    -EBUSY,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_INVALID);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
 TC(generated__enabled_suspending_resumed_completed,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_COMPLETED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
 
 TC(generated__enabled_suspending_resumed_invalid,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_ENABLED,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_INVALID);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
 /* Paths beginning with invalid */
 
@@ -447,7 +462,7 @@ TC(generated__invalid,
    NULL,
    NULL,
    -EINVAL,
-   VASI_SUSPEND_STATE_INVALID);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
 /* Paths beginning with suspending */
 
@@ -455,38 +470,38 @@ TC(generated__suspending_aborted,
    do_suspend_ebusy,
    cancel_suspend_success,
    -EBUSY,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_ABORTED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
 
 TC(generated__suspending_completed,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_COMPLETED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
 
 TC(generated__suspending_invalid,
    do_suspend_ebusy,
    cancel_suspend_success,
    -EBUSY,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_INVALID);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
 TC(generated__suspending_resumed_completed,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_COMPLETED);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
 
 TC(generated__suspending_resumed_invalid,
    do_suspend_success,
    NULL,
    0,
-   VASI_SUSPEND_STATE_SUSPENDING,
-   VASI_SUSPEND_STATE_RESUMED,
-   VASI_SUSPEND_STATE_INVALID);
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
 static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(handle_immediate_invalid),
