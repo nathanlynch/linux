@@ -57,11 +57,29 @@ static void pseries_suspend_wake(void)
 	post_mobility_fixup();
 }
 
-/* for qemu testing */
-static int fake_poll_vasi_state(struct papr_lpar_suspend_session *session,
-				vasi_suspend_state_t *state)
+static int poll_vasi_state(struct papr_lpar_suspend_session *session,
+			   vasi_suspend_state_t *state)
 {
-	*state = VASI_SUSPEND_STATE_SUSPENDING;
+	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
+	long hvrc;
+
+	/* Make sure the state is valid */
+	hvrc = plpar_hcall(H_VASI_STATE, retbuf, session->handle);
+	if (hvrc == 0) {
+		*state = retbuf[0];
+	} else if (hvrc == H_FUNCTION) {
+		/*
+		 * Allow suspend to proceed on hypervisors that don't
+		 * have H_VASI_STATE. If the subsequent ibm,suspend-me
+		 * fails we'll recover then.
+		 */
+		pr_notice_once("H_VASI_STATE not available, fabricating "
+			       "'Suspending' response.\n");
+		*state = VASI_SUSPEND_STATE_SUSPENDING;
+	} else {
+		pr_err_ratelimited("H_VASI_STATE failed (%ld)\n", hvrc);
+	}
+
 	return 0;
 }
 
@@ -76,7 +94,7 @@ static int fake_cancel_suspend(struct papr_lpar_suspend_session *session)
 }
 
 static const struct papr_suspend_ops lpar_hibernate_ops = {
-	.poll_vasi_state = fake_poll_vasi_state,
+	.poll_vasi_state = poll_vasi_state,
 	.do_suspend = do_suspend,
 	.cancel_suspend = fake_cancel_suspend,
 };
