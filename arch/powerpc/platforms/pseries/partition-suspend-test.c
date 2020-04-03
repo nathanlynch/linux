@@ -228,6 +228,13 @@ TC(handle_invalid_after_suspending,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
+TC(handle_h_hardware_after_enabled,
+   NULL,
+   NULL,
+   -EIO,
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__err(H_HARDWARE));
+
 /*
  * Suspend is administratively aborted relatively early.
  */
@@ -520,6 +527,7 @@ static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(handle__h_vasi_state__h_parameter),
 	KUNIT_CASE(handle__h_vasi_state__h_hardware),
 	KUNIT_CASE(handle_invalid_after_suspending),
+	KUNIT_CASE(handle_h_hardware_after_enabled),
 	KUNIT_CASE(handle_abort_after_enabled),
 	KUNIT_CASE(handle_abort_after_suspending),
 	KUNIT_CASE(success_each_state_once),
