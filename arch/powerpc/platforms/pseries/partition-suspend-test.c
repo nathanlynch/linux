@@ -376,6 +376,117 @@ TC(handle_resumed_after_enabled,
    VASI_SUSPEND_STATE_ENABLED,
    VASI_SUSPEND_STATE_RESUMED);
 
+TC(generated__aborted,
+   NULL,
+   NULL,
+   -ECANCELED,
+   VASI_SUSPEND_STATE_ABORTED);
+
+/* Paths beginning with enabled */
+
+TC(generated__enabled_aborted,
+   NULL,
+   NULL,
+   -ECANCELED,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_ABORTED);
+
+TC(generated__enabled_invalid,
+   NULL,
+   NULL,
+   -EINVAL,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_INVALID);
+
+TC(generated__enabled_suspending_aborted,
+   do_suspend_ebusy,
+   cancel_suspend_success,
+   -EBUSY,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_ABORTED);
+
+TC(generated__enabled_suspending_completed,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_COMPLETED);
+
+TC(generated__enabled_suspending_invalid,
+   do_suspend_ebusy,
+   cancel_suspend_success,
+   -EBUSY,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_INVALID);
+
+TC(generated__enabled_suspending_resumed_completed,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_COMPLETED);
+
+TC(generated__enabled_suspending_resumed_invalid,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_ENABLED,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_INVALID);
+
+/* Paths beginning with invalid */
+
+TC(generated__invalid,
+   NULL,
+   NULL,
+   -EINVAL,
+   VASI_SUSPEND_STATE_INVALID);
+
+/* Paths beginning with suspending */
+
+TC(generated__suspending_aborted,
+   do_suspend_ebusy,
+   cancel_suspend_success,
+   -EBUSY,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_ABORTED);
+
+TC(generated__suspending_completed,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_COMPLETED);
+
+TC(generated__suspending_invalid,
+   do_suspend_ebusy,
+   cancel_suspend_success,
+   -EBUSY,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_INVALID);
+
+TC(generated__suspending_resumed_completed,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_COMPLETED);
+
+TC(generated__suspending_resumed_invalid,
+   do_suspend_success,
+   NULL,
+   0,
+   VASI_SUSPEND_STATE_SUSPENDING,
+   VASI_SUSPEND_STATE_RESUMED,
+   VASI_SUSPEND_STATE_INVALID);
+
 static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(handle_immediate_invalid),
 	KUNIT_CASE(handle_invalid_after_suspending),
@@ -394,6 +505,22 @@ static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(handle_enomem_from_suspend_and_einval_from_cancel),
 	/* TODO: test H_VASI_STATE -> H_Parameter */
 	/* TODO: test cancelling -> all vasi states */
+
+	/* Generated tests */
+	KUNIT_CASE(generated__aborted),
+	KUNIT_CASE(generated__enabled_aborted),
+	KUNIT_CASE(generated__enabled_invalid),
+	KUNIT_CASE(generated__enabled_suspending_aborted),
+	KUNIT_CASE(generated__enabled_suspending_completed),
+	KUNIT_CASE(generated__enabled_suspending_invalid),
+	KUNIT_CASE(generated__enabled_suspending_resumed_completed),
+	KUNIT_CASE(generated__enabled_suspending_resumed_invalid),
+	KUNIT_CASE(generated__invalid),
+	KUNIT_CASE(generated__suspending_aborted),
+	KUNIT_CASE(generated__suspending_completed),
+	KUNIT_CASE(generated__suspending_invalid),
+	KUNIT_CASE(generated__suspending_resumed_completed),
+	KUNIT_CASE(generated__suspending_resumed_invalid),
 	{},
 };
 
