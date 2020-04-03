@@ -13,6 +13,7 @@
 #include <asm/mmu.h>
 #include <asm/rtas.h>
 #include <asm/topology.h>
+#include "papr-suspend.h"
 #include "../../kernel/cacheinfo.h"
 
 static u64 stream_id;
@@ -115,6 +116,30 @@ static int pseries_prepare_late(void)
 	return 0;
 }
 
+/* for qemu testing */
+static int fake_poll_vasi_state(struct papr_lpar_suspend_session *session,
+				vasi_suspend_state_t *state)
+{
+	*state = VASI_SUSPEND_STATE_SUSPENDING;
+	return 0;
+}
+
+static int do_suspend(struct papr_lpar_suspend_session *session)
+{
+	return -EIO;
+}
+
+static int fake_cancel_suspend(struct papr_lpar_suspend_session *session)
+{
+	return -EINVAL;
+}
+
+static const struct papr_suspend_ops lpar_hibernate_ops = {
+	.poll_vasi_state = fake_poll_vasi_state,
+	.do_suspend = do_suspend,
+	.cancel_suspend = fake_cancel_suspend,
+};
+
 /**
  * store_hibernate - Initiate partition hibernation
  * @dev:		subsys root device
@@ -132,51 +157,26 @@ static ssize_t store_hibernate(struct device *dev,
 			       struct device_attribute *attr,
 			       const char *buf, size_t count)
 {
-	cpumask_var_t offline_mask;
-	int rc;
+	struct papr_lpar_suspend_session session;
+	unsigned long handle;
+	ssize_t ret;
 
 	if (!capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
-	if (!alloc_cpumask_var(&offline_mask, GFP_KERNEL))
-		return -ENOMEM;
+	ret = kstrtoul(buf, 16, &handle);
+	if (ret)
+		goto done;
 
-	stream_id = simple_strtoul(buf, NULL, 16);
+	papr_suspend_session_init(&session, handle, &lpar_hibernate_ops);
 
-	do {
-		rc = pseries_suspend_begin(PM_SUSPEND_MEM);
-		if (rc == -EAGAIN)
-			ssleep(1);
-	} while (rc == -EAGAIN);
+	ret = papr_suspend_lpar(&session);
+	if (ret)
+		goto done;
 
-	if (!rc) {
-		/* All present CPUs must be online */
-		cpumask_andnot(offline_mask, cpu_present_mask,
-				cpu_online_mask);
-		rc = rtas_online_cpus_mask(offline_mask);
-		if (rc) {
-			pr_err("%s: Could not bring present CPUs online.\n",
-					__func__);
-			goto out;
-		}
-
-		stop_topology_update();
-		rc = pm_suspend(PM_SUSPEND_MEM);
-		start_topology_update();
-
-		/* Take down CPUs not online prior to suspend */
-		if (!rtas_offline_cpus_mask(offline_mask))
-			pr_warn("%s: Could not restore CPUs to offline "
-					"state.\n", __func__);
-	}
-
-	stream_id = 0;
-
-	if (!rc)
-		rc = count;
-out:
-	free_cpumask_var(offline_mask);
-	return rc;
+	ret = count; 
+done:
+	return ret;
 }
 
 #define USER_DT_UPDATE	0
