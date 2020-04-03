@@ -52,6 +52,11 @@ static int pseries_suspend_enter(suspend_state_t state)
 	return ret;
 }
 
+static void pseries_suspend_wake(void)
+{
+	post_mobility_fixup();
+}
+
 /* for qemu testing */
 static int fake_poll_vasi_state(struct papr_lpar_suspend_session *session,
 				vasi_suspend_state_t *state)
@@ -147,6 +152,7 @@ static struct bus_type suspend_subsys = {
 static const struct platform_suspend_ops pseries_suspend_ops = {
 	.valid		= suspend_valid_only_mem,
 	.enter		= pseries_suspend_enter,
+	.wake		= pseries_suspend_wake,
 };
 
 /**
