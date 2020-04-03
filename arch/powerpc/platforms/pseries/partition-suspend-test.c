@@ -204,6 +204,12 @@ TC(handle_immediate_invalid,
    -EINVAL,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
+TC(handle__h_vasi_state__h_parameter,
+   NULL,
+   NULL,
+   -EINVAL,
+   h_vasi_state__err(H_PARAMETER));
+
 /*
  * Supplied handle is invalidated after entering Suspending state,
  * and/or e.g. ibm,suspend-me fails with -900x.
@@ -505,6 +511,7 @@ TC(generated__suspending_resumed_invalid,
 
 static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(handle_immediate_invalid),
+	KUNIT_CASE(handle__h_vasi_state__h_parameter),
 	KUNIT_CASE(handle_invalid_after_suspending),
 	KUNIT_CASE(handle_abort_after_enabled),
 	KUNIT_CASE(handle_abort_after_suspending),
