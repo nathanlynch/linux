@@ -62,12 +62,13 @@ static int poll_vasi_state(struct papr_lpar_suspend_session *session,
 {
 	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
 	long hvrc;
+	int ret;
 
-	/* Make sure the state is valid */
+	ret = 0;
 	hvrc = plpar_hcall(H_VASI_STATE, retbuf, session->handle);
-	if (hvrc == 0) {
-		*state = retbuf[0];
-	} else if (hvrc == H_FUNCTION) {
+
+	switch (hvrc) {
+	case H_FUNCTION:
 		/*
 		 * Allow suspend to proceed on hypervisors that don't
 		 * have H_VASI_STATE. If the subsequent ibm,suspend-me
@@ -76,11 +77,18 @@ static int poll_vasi_state(struct papr_lpar_suspend_session *session,
 		pr_notice_once("H_VASI_STATE not available, fabricating "
 			       "'Suspending' response.\n");
 		*state = VASI_SUSPEND_STATE_SUSPENDING;
-	} else {
-		pr_err_ratelimited("H_VASI_STATE failed (%ld)\n", hvrc);
+		break;
+	case H_SUCCESS:
+		*state = retbuf[0];
+		break;
+	default:
+		pr_err_ratelimited("H_VASI_STATE(handle=0x%llx) failed (%ld)\n",
+				   session->handle, hvrc);
+		ret = -EIO;
+		break;
 	}
 
-	return 0;
+	return ret;
 }
 
 static int do_suspend(struct papr_lpar_suspend_session *session)
