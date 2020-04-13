@@ -88,15 +88,47 @@ static int do_suspend(struct papr_lpar_suspend_session *session)
 	return pm_suspend(PM_SUSPEND_MEM);
 }
 
-static int fake_cancel_suspend(struct papr_lpar_suspend_session *session)
+static int cancel_suspend(struct papr_lpar_suspend_session *session)
 {
-	return -EINVAL;
+	s64 signal;
+	s64 reason;
+	u64 handle;
+	long hvrc;
+	int ret;
+
+	handle = session->handle;
+	signal = H_VASI_SIGNAL_CANCEL;
+	reason = 0;
+
+	hvrc = plpar_hcall_norets(H_VASI_SIGNAL, handle, signal, reason);
+
+	switch(hvrc) {
+	case H_FUNCTION:
+		/*
+		 * If the hypervisor doesn't implement this facility,
+		 * note it but proceed; it makes no difference to the
+		 * OS.
+		 */
+		pr_notice_once("Attempted to cancel suspension, but "
+			       "H_VASI_SIGNAL not available.\n");
+		fallthrough;
+	case H_SUCCESS:
+		ret = 0;
+		break;
+	default:
+		ret = -EIO;
+		pr_err_ratelimited("H_VASI_SIGNAL(handle=0x%llx, signal=%lld) "
+				   "failed (%ld)\n", handle, signal, hvrc);
+		break;
+	}
+
+	return ret;
 }
 
 static const struct papr_suspend_ops lpar_hibernate_ops = {
 	.poll_vasi_state = poll_vasi_state,
 	.do_suspend = do_suspend,
-	.cancel_suspend = fake_cancel_suspend,
+	.cancel_suspend = cancel_suspend,
 };
 
 /**
