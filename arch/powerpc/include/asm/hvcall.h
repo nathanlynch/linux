@@ -155,6 +155,15 @@
 #define H_VASI_RESUMED          5
 #define H_VASI_COMPLETED        6
 
+/* VASI Signal Codes */
+#define H_VASI_SIGNAL_NULL      0
+#define H_VASI_SIGNAL_CANCEL    1
+#define H_VASI_SIGNAL_ABORT     2
+#define H_VASI_SIGNAL_SUSPEND   3
+#define H_VASI_SIGNAL_COMPLETE  4
+#define H_VASI_SIGNAL_ENABLE    5
+#define H_VASI_SIGNAL_FAILOVER  6
+
 /* Each control block has to be on a 4K boundary */
 #define H_CB_ALIGNMENT          4096
 
@@ -261,6 +270,7 @@
 #define H_ADD_CONN		0x284
 #define H_DEL_CONN		0x288
 #define H_JOIN			0x298
+#define H_VASI_SIGNAL           0x2A0
 #define H_VASI_STATE            0x2A4
 #define H_VIOCTL		0x2A8
 #define H_ENABLE_CRQ		0x2B0
