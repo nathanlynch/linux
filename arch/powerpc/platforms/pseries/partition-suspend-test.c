@@ -137,11 +137,11 @@ define_cancel_suspend_fn(cancel_suspend_shouldnt_call, 0);
 static bool abort_code_valid(u32 code)
 {
 	/*
-	 * The abort/reason code supplied to H_VASI_SIGNAL
+	 * The abort/reason code supplied to a H_VASI_SIGNAL
 	 * cancellation request from the suspending partition must
 	 * have the form 0x06xxxxxx.
 	 */
-	return (code & 0xff000000) == 0x06000000;
+	return code >> 24 == 0x6;
 }
 
 static void tc_inner(struct kunit *t,
