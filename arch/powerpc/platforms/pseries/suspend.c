@@ -99,7 +99,7 @@ static int do_suspend(struct papr_lpar_suspend_session *session)
 static int cancel_suspend(struct papr_lpar_suspend_session *session)
 {
 	s64 signal;
-	s64 reason;
+	u32 reason;
 	u64 handle;
 	long hvrc;
 	int ret;
@@ -125,8 +125,9 @@ static int cancel_suspend(struct papr_lpar_suspend_session *session)
 		break;
 	default:
 		ret = -EIO;
-		pr_err_ratelimited("H_VASI_SIGNAL(handle=0x%llx, signal=%lld) "
-				   "failed (%ld)\n", handle, signal, hvrc);
+		pr_err_ratelimited("H_VASI_SIGNAL(handle=0x%llx, signal=%lld, "
+				   "reason=0x%x) failed (%ld)\n", handle,
+				   signal, reason, hvrc);
 		break;
 	}
 
