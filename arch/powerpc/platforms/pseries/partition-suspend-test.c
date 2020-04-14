@@ -134,6 +134,16 @@ define_cancel_suspend_fn(cancel_suspend_shouldnt_call, 0);
 
 /* Test cases */
 
+static bool abort_code_valid(u32 code)
+{
+	/*
+	 * The abort/reason code supplied to H_VASI_SIGNAL
+	 * cancellation request from the suspending partition must
+	 * have the form 0x06xxxxxx.
+	 */
+	return (code & 0xff000000) == 0x06000000;
+}
+
 static void tc_inner(struct kunit *t,
 		     int (*do_suspend_fn)(struct papr_lpar_suspend_session *),
 		     int (*cancel_suspend_fn)(struct papr_lpar_suspend_session *),
@@ -141,6 +151,7 @@ static void tc_inner(struct kunit *t,
 		     const h_vasi_state_result_t *vasi_states)
 {
 	struct suspend_test_context *ctx = t->priv;
+	u32 abort_code;
 
 	ctx->ops.poll_vasi_state = test_poll_vasi_state;
 	if (do_suspend_fn != NULL)
@@ -165,6 +176,10 @@ static void tc_inner(struct kunit *t,
 		KUNIT_EXPECT_TRUE(t, ctx->canceled);
 	else
 		KUNIT_EXPECT_FALSE(t, ctx->canceled);
+	if (expected_result != 0) {
+		abort_code = papr_suspend_abort_code(&ctx->session);
+		KUNIT_EXPECT_TRUE(t, abort_code_valid(abort_code));
+	}
 }
 
 /**
