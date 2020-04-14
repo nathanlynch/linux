@@ -124,5 +124,25 @@ int papr_suspend_lpar(struct papr_lpar_suspend_session *session)
 
 u32 papr_suspend_abort_code(const struct papr_lpar_suspend_session *session)
 {
-	return 0;
+	u32 ret;
+
+	if (session->result == 0) {
+		/*
+		 * It is an error to call this if the suspend
+		 * operation has not actually encountered a problem.
+		 */
+		pr_warn_once("No valid abort code for successful suspend.\n");
+		ret = 0;
+	} else {
+		/*
+		 * The first byte of the reason/abort code must be
+		 * 0x06 to indicate the failing entity is the
+		 * suspending partition. The remaining three bytes are
+		 * opaque to the platform; we simply record the
+		 * positive errno value.
+		 */
+		ret = (0x6 << 24) | (abs(session->result) & 0xffffff);
+	}
+
+	return ret;
 }
