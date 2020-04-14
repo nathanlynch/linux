@@ -22,8 +22,11 @@
 #define RTAS_RMOBUF_MAX (64 * 1024)
 
 /* RTAS return status codes */
-#define RTAS_NOT_SUSPENDABLE	-9004
+#define RTAS_OUTSTANDING_COPROC -9006 /* Outstanding coprocessor operations */
+#define RTAS_THREADS_ACTIVE	-9005 /* Multiple processor threads active */
+#define RTAS_NOT_SUSPENDABLE	-9004 /* Partition not suspendable */
 #define RTAS_BUSY		-2    /* RTAS Busy */
+#define RTAS_SUSPEND_ABORTED    9000  /* Partition suspension aborted */
 #define RTAS_EXTENDED_DELAY_MIN	9900
 #define RTAS_EXTENDED_DELAY_MAX	9905
 
