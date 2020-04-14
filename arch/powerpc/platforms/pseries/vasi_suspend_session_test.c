@@ -47,7 +47,7 @@ struct suspend_test_context {
 
 /* papr_lpar_suspend_session->ops->poll_vasi_state() test doubles */
 
-static int test_poll_vasi_state(struct vasi_suspend_session *s,
+static int poll_vasi_state_stub(struct vasi_suspend_session *s,
 				vasi_suspend_state_t *state)
 {
 	struct suspend_test_context *ctx;
@@ -201,7 +201,7 @@ static void tc_inner(struct kunit *t,
 	struct suspend_test_context *ctx = t->priv;
 	u32 abort_code;
 
-	ctx->ops.poll_vasi_state = test_poll_vasi_state;
+	ctx->ops.poll_vasi_state = poll_vasi_state_stub;
 	if (do_suspend_fn != NULL)
 		ctx->ops.do_suspend = do_suspend_fn;
 	if (cancel_suspend_fn != NULL)
