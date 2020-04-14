@@ -36,12 +36,12 @@ static int pseries_suspend_enter(suspend_state_t state)
 	case 0:
 		ret = 0;
 		break;
-	case 9000: /* Suspension aborted */
+	case RTAS_SUSPEND_ABORTED:
 		ret = -ECANCELED;
 		break;
-	case -9004:
-	case -9005:
-	case -9006:
+	case RTAS_NOT_SUSPENDABLE:
+	case RTAS_THREADS_ACTIVE:
+	case RTAS_OUTSTANDING_COPROC:
 		ret = -EBUSY;
 		break;
 	case -1: /* hw error */
