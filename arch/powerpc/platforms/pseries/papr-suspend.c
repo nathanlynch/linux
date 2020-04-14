@@ -121,3 +121,8 @@ int papr_suspend_lpar(struct papr_lpar_suspend_session *session)
 
 	return session->result;
 }
+
+u32 papr_suspend_abort_code(const struct papr_lpar_suspend_session *session)
+{
+	return 0;
+}
