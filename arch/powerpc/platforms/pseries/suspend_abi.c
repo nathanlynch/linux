@@ -6,7 +6,7 @@
 #include <linux/errno.h>
 #include <linux/kernel.h>
 #include "papr-suspend.h"
-#include "suspend.h"
+#include "suspend_internal.h"
 
 static struct device suspend_dev;
 

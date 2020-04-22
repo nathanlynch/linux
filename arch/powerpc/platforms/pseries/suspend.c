@@ -14,7 +14,7 @@
 #include <asm/rtas.h>
 #include <asm/topology.h>
 #include "papr-suspend.h"
-#include "suspend.h"
+#include "suspend_internal.h"
 #include "../../kernel/cacheinfo.h"
 
 /**
