@@ -56,6 +56,12 @@ static void pseries_suspend_wake(void)
 	post_mobility_fixup();
 }
 
+static const struct platform_suspend_ops pseries_suspend_ops = {
+	.valid		= suspend_valid_only_mem,
+	.enter		= pseries_suspend_enter,
+	.wake		= pseries_suspend_wake,
+};
+
 static int poll_vasi_state(struct papr_lpar_suspend_session *session,
 			   vasi_suspend_state_t *state)
 {
@@ -143,12 +149,6 @@ const struct papr_suspend_ops *pseries_suspend_default_ops(void)
 {
 	return &lpar_hibernate_ops;
 }
-
-static const struct platform_suspend_ops pseries_suspend_ops = {
-	.valid		= suspend_valid_only_mem,
-	.enter		= pseries_suspend_enter,
-	.wake		= pseries_suspend_wake,
-};
 
 static int __init pseries_suspend_init(void)
 {
