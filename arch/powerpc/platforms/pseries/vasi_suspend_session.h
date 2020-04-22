@@ -51,6 +51,8 @@ struct vasi_suspend_ops {
 	int (*poll_vasi_state)(struct vasi_suspend_session *session,
 			       vasi_suspend_state_t *state);
 	int (*do_suspend)(struct vasi_suspend_session *s);
+	void (*resume)(struct vasi_suspend_session *s);
+	void (*complete)(struct vasi_suspend_session *s);
 	int (*cancel_suspend)(struct vasi_suspend_session *s);
 };
 
