@@ -29,6 +29,7 @@ obj-$(CONFIG_PPC_SPLPAR)	+= vphn.o
 obj-$(CONFIG_PPC_SVM)		+= svm.o
 obj-$(CONFIG_FA_DUMP)		+= rtas-fadump.o
 
-obj-$(CONFIG_SUSPEND)		+= suspend.o papr-suspend.o suspend_abi.o
+obj-$(CONFIG_SUSPEND)		+= suspend.o suspend_abi.o \
+                                   vasi_suspend_session.o
 
 obj-$(CONFIG_PSERIES_PARTITION_SUSPEND_KUNIT_TEST) += partition-suspend-test.o
