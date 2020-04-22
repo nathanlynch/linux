@@ -150,12 +150,6 @@ static const struct platform_suspend_ops pseries_suspend_ops = {
 	.wake		= pseries_suspend_wake,
 };
 
-/**
- * pseries_suspend_init - initcall for pSeries suspend
- *
- * Return value:
- * 	0 on success / other on failure
- **/
 static int __init pseries_suspend_init(void)
 {
 	if (!firmware_has_feature(FW_FEATURE_LPAR))
