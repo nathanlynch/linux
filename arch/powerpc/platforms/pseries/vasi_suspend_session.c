@@ -1,19 +1,18 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
-
 #include "vasi_suspend_session.h"
 
-void vasi_suspend_session_init(struct papr_lpar_suspend_session *s, u64 handle,
-			       const struct papr_suspend_ops *ops)
+void vasi_suspend_session_init(struct vasi_suspend_session *s, u64 handle,
+			       const struct vasi_suspend_ops *ops)
 {
-	*s = (struct papr_lpar_suspend_session) {
+	*s = (struct vasi_suspend_session) {
 		.handle = handle,
 		.state = LPAR_SUSPEND_STARTING,
 		.ops = ops,
 	};
 }
 
-static void step_state(struct papr_lpar_suspend_session *session, vasi_suspend_state_t vasi_state)
+static void step_state(struct vasi_suspend_session *session, vasi_suspend_state_t vasi_state)
 {
 	switch (session->state) {
 	case LPAR_SUSPEND_STARTING:
@@ -101,7 +100,7 @@ static void step_state(struct papr_lpar_suspend_session *session, vasi_suspend_s
 	}
 }
 
-int vasi_suspend_session_run(struct papr_lpar_suspend_session *session)
+int vasi_suspend_session_run(struct vasi_suspend_session *session)
 {
 	while (session->state != LPAR_SUSPEND_DONE) {
 		vasi_suspend_state_t vasi_state;
@@ -122,7 +121,7 @@ int vasi_suspend_session_run(struct papr_lpar_suspend_session *session)
 	return session->result;
 }
 
-u32 vasi_suspend_session_abort_code(const struct papr_lpar_suspend_session *session)
+u32 vasi_suspend_session_abort_code(const struct vasi_suspend_session *session)
 {
 	u32 ret;
 

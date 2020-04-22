@@ -1,5 +1,5 @@
-#ifndef PAPR_SUSPEND_H
-#define PAPR_SUSPEND_H
+#ifndef VASI_SUSPEND_SESSION_H
+#define VASI_SUSPEND_SESSION_H
 
 #include <linux/types.h>
 
@@ -37,27 +37,27 @@ typedef enum lpar_suspend_states {
 	LPAR_SUSPEND_DONE,
 } lp_suspend_state_t;
 
-struct papr_suspend_ops;
+struct vasi_suspend_ops;
 
-struct papr_lpar_suspend_session {
+struct vasi_suspend_session {
 /* private: All fields for internal use. */
 	u64 handle;
 	lp_suspend_state_t state;
 	int result;
-	const struct papr_suspend_ops *ops;
+	const struct vasi_suspend_ops *ops;
 };
 
-struct papr_suspend_ops {
-	int (*poll_vasi_state)(struct papr_lpar_suspend_session *session,
+struct vasi_suspend_ops {
+	int (*poll_vasi_state)(struct vasi_suspend_session *session,
 			       vasi_suspend_state_t *state);
-	int (*do_suspend)(struct papr_lpar_suspend_session *s);
-	int (*cancel_suspend)(struct papr_lpar_suspend_session *s);
+	int (*do_suspend)(struct vasi_suspend_session *s);
+	int (*cancel_suspend)(struct vasi_suspend_session *s);
 };
 
-void vasi_suspend_session_init(struct papr_lpar_suspend_session *s, u64 handle,
-			       const struct papr_suspend_ops *ops);
+void vasi_suspend_session_init(struct vasi_suspend_session *s, u64 handle,
+			       const struct vasi_suspend_ops *ops);
 
-int vasi_suspend_session_run(struct papr_lpar_suspend_session *session);
-u32 vasi_suspend_session_abort_code(const struct papr_lpar_suspend_session *session);
+int vasi_suspend_session_run(struct vasi_suspend_session *session);
+u32 vasi_suspend_session_abort_code(const struct vasi_suspend_session *session);
 
-#endif /* PAPR_SUSPEND_H */
+#endif /* VASI_SUSPEND_SESSION_H */

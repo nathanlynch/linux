@@ -34,18 +34,18 @@ typedef struct h_vasi_state_result {
 	define_vasi_state_result((hvrc), VASI_SUSPEND_STATE_SENTINEL)
 
 struct suspend_test_context {
-	struct papr_lpar_suspend_session session;
+	struct vasi_suspend_session session;
 	const h_vasi_state_result_t *state_seq;
 	unsigned short state_seqno;
 	bool suspend_called;
 	bool canceled;
 	struct kunit *test;
-	struct papr_suspend_ops ops;
+	struct vasi_suspend_ops ops;
 };
 
 /* papr_lpar_suspend_session->ops->poll_vasi_state() test doubles */
 
-static int test_poll_vasi_state(struct papr_lpar_suspend_session *s,
+static int test_poll_vasi_state(struct vasi_suspend_session *s,
 				vasi_suspend_state_t *state)
 {
 	struct suspend_test_context *ctx;
@@ -78,7 +78,7 @@ static int test_poll_vasi_state(struct papr_lpar_suspend_session *s,
 	return ret;
 }
 
-static int poll_vasi_state_shouldnt_call(struct papr_lpar_suspend_session *s,
+static int poll_vasi_state_shouldnt_call(struct vasi_suspend_session *s,
 					 vasi_suspend_state_t *state)
 {
 	struct suspend_test_context *ctx;
@@ -89,10 +89,10 @@ static int poll_vasi_state_shouldnt_call(struct papr_lpar_suspend_session *s,
 	return -EIO;
 }
 
-/* papr_lpar_suspend_session->ops->do_suspend() test doubles */
+/* vasi_suspend_session->ops->do_suspend() test doubles */
 
 #define define_do_suspend_fn(fn_name, rc)				\
-	static int fn_name(struct papr_lpar_suspend_session *s)		\
+	static int fn_name(struct vasi_suspend_session *s)		\
 	{								\
 		struct suspend_test_context *ctx;			\
 									\
@@ -111,10 +111,10 @@ define_do_suspend_fn(do_suspend_enomem, -ENOMEM);
 define_do_suspend_fn(do_suspend_ebusy, -EBUSY);
 define_do_suspend_fn(do_suspend_shouldnt_call, 0);
 
-/* papr_lpar_suspend_session->ops->cancel_suspend() test doubles */
+/* vasi_suspend_session->ops->cancel_suspend() test doubles */
 
 #define define_cancel_suspend_fn(fn_name, rc)				\
-	static int fn_name(struct papr_lpar_suspend_session *s)		\
+	static int fn_name(struct vasi_suspend_session *s)		\
 	{								\
 		struct suspend_test_context *ctx;			\
 									\
@@ -145,8 +145,8 @@ static bool abort_code_valid(u32 code)
 }
 
 static void tc_inner(struct kunit *t,
-		     int (*do_suspend_fn)(struct papr_lpar_suspend_session *),
-		     int (*cancel_suspend_fn)(struct papr_lpar_suspend_session *),
+		     int (*do_suspend_fn)(struct vasi_suspend_session *),
+		     int (*cancel_suspend_fn)(struct vasi_suspend_session *),
 		     int expected_result,
 		     const h_vasi_state_result_t *vasi_states)
 {
@@ -584,7 +584,7 @@ static int lpar_suspend_tsuite_init(struct kunit *t)
 	ctx = kunit_kzalloc(t, sizeof(*ctx), GFP_KERNEL);
 	KUNIT_ASSERT_NOT_ERR_OR_NULL(t, ctx);
 
-	ctx->ops = (struct papr_suspend_ops) {
+	ctx->ops = (struct vasi_suspend_ops) {
 		.poll_vasi_state = poll_vasi_state_shouldnt_call,
 		.do_suspend      = do_suspend_shouldnt_call,
 		.cancel_suspend  = cancel_suspend_shouldnt_call,

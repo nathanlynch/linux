@@ -62,7 +62,7 @@ static const struct platform_suspend_ops pseries_suspend_ops = {
 	.wake		= pseries_suspend_wake,
 };
 
-static int poll_vasi_state(struct papr_lpar_suspend_session *session,
+static int poll_vasi_state(struct vasi_suspend_session *session,
 			   vasi_suspend_state_t *state)
 {
 	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
@@ -96,12 +96,12 @@ static int poll_vasi_state(struct papr_lpar_suspend_session *session,
 	return ret;
 }
 
-static int do_suspend(struct papr_lpar_suspend_session *session)
+static int do_suspend(struct vasi_suspend_session *session)
 {
 	return pm_suspend(PM_SUSPEND_MEM);
 }
 
-static int cancel_suspend(struct papr_lpar_suspend_session *session)
+static int cancel_suspend(struct vasi_suspend_session *session)
 {
 	s64 signal;
 	u32 reason;
@@ -139,13 +139,13 @@ static int cancel_suspend(struct papr_lpar_suspend_session *session)
 	return ret;
 }
 
-static const struct papr_suspend_ops lpar_hibernate_ops = {
+static const struct vasi_suspend_ops lpar_hibernate_ops = {
 	.poll_vasi_state = poll_vasi_state,
 	.do_suspend = do_suspend,
 	.cancel_suspend = cancel_suspend,
 };
 
-const struct papr_suspend_ops *pseries_suspend_default_ops(void)
+const struct vasi_suspend_ops *pseries_suspend_default_ops(void)
 {
 	return &lpar_hibernate_ops;
 }

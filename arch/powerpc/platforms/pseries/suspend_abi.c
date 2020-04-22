@@ -32,7 +32,7 @@ static ssize_t store_hibernate(struct device *dev,
 			       struct device_attribute *attr,
 			       const char *buf, size_t count)
 {
-	struct papr_lpar_suspend_session session;
+	struct vasi_suspend_session session;
 	unsigned long handle;
 	ssize_t ret;
 
