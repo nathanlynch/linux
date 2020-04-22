@@ -14,9 +14,8 @@
 #include <asm/rtas.h>
 #include <asm/topology.h>
 #include "papr-suspend.h"
+#include "suspend.h"
 #include "../../kernel/cacheinfo.h"
-
-static struct device suspend_dev;
 
 /**
  * pseries_suspend_enter - Final phase of hibernation
@@ -140,105 +139,16 @@ static const struct papr_suspend_ops lpar_hibernate_ops = {
 	.cancel_suspend = cancel_suspend,
 };
 
-/**
- * store_hibernate - Initiate partition hibernation
- * @dev:		subsys root device
- * @attr:		device attribute struct
- * @buf:		buffer
- * @count:		buffer size
- *
- * Write the stream ID received from the HMC to this file
- * to trigger hibernating the partition
- *
- * Return value:
- * 	number of bytes printed to buffer / other on failure
- **/
-static ssize_t store_hibernate(struct device *dev,
-			       struct device_attribute *attr,
-			       const char *buf, size_t count)
+const struct papr_suspend_ops *pseries_suspend_default_ops(void)
 {
-	struct papr_lpar_suspend_session session;
-	unsigned long handle;
-	ssize_t ret;
-
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
-
-	ret = kstrtoul(buf, 16, &handle);
-	if (ret)
-		goto done;
-
-	papr_suspend_session_init(&session, handle, &lpar_hibernate_ops);
-
-	ret = papr_suspend_lpar(&session);
-	if (ret)
-		goto done;
-
-	ret = count; 
-done:
-	return ret;
+	return &lpar_hibernate_ops;
 }
-
-#define USER_DT_UPDATE	0
-#define KERN_DT_UPDATE	1
-
-/**
- * show_hibernate - Report device tree update responsibilty
- * @dev:		subsys root device
- * @attr:		device attribute struct
- * @buf:		buffer
- *
- * Report whether a device tree update is performed by the kernel after a
- * resume, or if drmgr must coordinate the update from user space.
- *
- * Return value:
- *	0 if drmgr is to initiate update, and 1 otherwise
- **/
-static ssize_t show_hibernate(struct device *dev,
-			      struct device_attribute *attr,
-			      char *buf)
-{
-	return sprintf(buf, "%d\n", KERN_DT_UPDATE);
-}
-
-static DEVICE_ATTR(hibernate, 0644, show_hibernate, store_hibernate);
-
-static struct bus_type suspend_subsys = {
-	.name = "power",
-	.dev_name = "power",
-};
 
 static const struct platform_suspend_ops pseries_suspend_ops = {
 	.valid		= suspend_valid_only_mem,
 	.enter		= pseries_suspend_enter,
 	.wake		= pseries_suspend_wake,
 };
-
-/**
- * pseries_suspend_sysfs_register - Register with sysfs
- *
- * Return value:
- * 	0 on success / other on failure
- **/
-static int pseries_suspend_sysfs_register(struct device *dev)
-{
-	int rc;
-
-	if ((rc = subsys_system_register(&suspend_subsys, NULL)))
-		return rc;
-
-	dev->id = 0;
-	dev->bus = &suspend_subsys;
-
-	if ((rc = device_create_file(suspend_subsys.dev_root, &dev_attr_hibernate)))
-		goto subsys_unregister;
-
-	return 0;
-
-subsys_unregister:
-	bus_unregister(&suspend_subsys);
-	return rc;
-}
 
 /**
  * pseries_suspend_init - initcall for pSeries suspend
@@ -248,15 +158,15 @@ subsys_unregister:
  **/
 static int __init pseries_suspend_init(void)
 {
-	int rc;
+	int ret;
 
+	ret = -ENODEV;
 	if (!firmware_has_feature(FW_FEATURE_LPAR))
-		return 0;
+		goto done;
 
-	if ((rc = pseries_suspend_sysfs_register(&suspend_dev)))
-		return rc;
-
+	ret = 0;
 	suspend_set_ops(&pseries_suspend_ops);
-	return 0;
+done:
+	return ret;
 }
 machine_device_initcall(pseries, pseries_suspend_init);
