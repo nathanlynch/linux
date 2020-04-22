@@ -38,6 +38,8 @@ struct suspend_test_context {
 	const h_vasi_state_result_t *state_seq;
 	unsigned short state_seqno;
 	bool suspend_called;
+	bool resume_called;
+	bool complete_called;
 	bool canceled;
 	struct kunit *test;
 	struct vasi_suspend_ops ops;
@@ -131,6 +133,28 @@ define_do_suspend_fn(do_suspend_shouldnt_call, 0);
 define_cancel_suspend_fn(cancel_suspend_success, 0);
 define_cancel_suspend_fn(cancel_suspend_einval, -EINVAL);
 define_cancel_suspend_fn(cancel_suspend_shouldnt_call, 0);
+
+static void resume_stub(struct vasi_suspend_session *s)
+{
+	struct suspend_test_context *ctx;
+
+	ctx = container_of(s, struct suspend_test_context, session);
+
+	/* Resume callback should be invoked only once. */
+	KUNIT_EXPECT_FALSE(ctx->test, ctx->resume_called);
+	ctx->resume_called = true;
+}
+
+static void complete_stub(struct vasi_suspend_session *s)
+{
+	struct suspend_test_context *ctx;
+
+	ctx = container_of(s, struct suspend_test_context, session);
+
+	/* Complete callback should be invoked only once. */
+	KUNIT_EXPECT_FALSE(ctx->test, ctx->complete_called);
+	ctx->complete_called = true;
+}
 
 /* Test cases */
 
@@ -587,6 +611,8 @@ static int lpar_suspend_tsuite_init(struct kunit *t)
 	ctx->ops = (struct vasi_suspend_ops) {
 		.poll_vasi_state = poll_vasi_state_shouldnt_call,
 		.do_suspend      = do_suspend_shouldnt_call,
+		.resume          = resume_stub,
+		.complete        = complete_stub,
 		.cancel_suspend  = cancel_suspend_shouldnt_call,
 	};
 	ctx->test = t;
