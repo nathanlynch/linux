@@ -6,7 +6,7 @@
 
 #include <kunit/test.h>
 
-#include "papr-suspend.h"
+#include "vasi_suspend_session.h"
 
 #define TEST_VASI_STREAM_ID 0xabcdabcdabcdabcd
 

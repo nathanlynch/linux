@@ -5,7 +5,7 @@
 #include <linux/device.h>
 #include <linux/errno.h>
 #include <linux/kernel.h>
-#include "papr-suspend.h"
+#include "vasi_suspend_session.h"
 #include "suspend_internal.h"
 
 static struct device suspend_dev;

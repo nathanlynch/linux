@@ -13,7 +13,7 @@
 #include <asm/mmu.h>
 #include <asm/rtas.h>
 #include <asm/topology.h>
-#include "papr-suspend.h"
+#include "vasi_suspend_session.h"
 #include "suspend_internal.h"
 #include "../../kernel/cacheinfo.h"
 

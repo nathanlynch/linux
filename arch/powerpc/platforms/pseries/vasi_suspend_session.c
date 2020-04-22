@@ -1,7 +1,7 @@
 #include <linux/kernel.h>
 #include <linux/slab.h>
 
-#include "papr-suspend.h"
+#include "vasi_suspend_session.h"
 
 void papr_suspend_session_init(struct papr_lpar_suspend_session *s, u64 handle,
 			       const struct papr_suspend_ops *ops)
