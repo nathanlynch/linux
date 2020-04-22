@@ -158,15 +158,11 @@ static const struct platform_suspend_ops pseries_suspend_ops = {
  **/
 static int __init pseries_suspend_init(void)
 {
-	int ret;
-
-	ret = -ENODEV;
 	if (!firmware_has_feature(FW_FEATURE_LPAR))
-		goto done;
+		return -ENODEV;
 
-	ret = 0;
 	suspend_set_ops(&pseries_suspend_ops);
-done:
-	return ret;
+
+	return 0;
 }
 machine_device_initcall(pseries, pseries_suspend_init);
