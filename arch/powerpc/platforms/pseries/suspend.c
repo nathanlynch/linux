@@ -111,7 +111,7 @@ static int cancel_suspend(struct papr_lpar_suspend_session *session)
 
 	handle = session->handle;
 	signal = H_VASI_SIGNAL_CANCEL;
-	reason = papr_suspend_abort_code(session);
+	reason = vasi_suspend_session_abort_code(session);
 
 	hvrc = plpar_hcall_norets(H_VASI_SIGNAL, handle, signal, reason);
 

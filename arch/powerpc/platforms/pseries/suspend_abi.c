@@ -43,9 +43,9 @@ static ssize_t store_hibernate(struct device *dev,
 	if (ret)
 		goto done;
 
-	papr_suspend_session_init(&session, handle, pseries_suspend_default_ops());
+	vasi_suspend_session_init(&session, handle, pseries_suspend_default_ops());
 
-	ret = papr_suspend_lpar(&session);
+	ret = vasi_suspend_session_run(&session);
 	if (ret)
 		goto done;
 

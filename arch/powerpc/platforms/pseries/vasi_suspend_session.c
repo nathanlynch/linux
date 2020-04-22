@@ -3,7 +3,7 @@
 
 #include "vasi_suspend_session.h"
 
-void papr_suspend_session_init(struct papr_lpar_suspend_session *s, u64 handle,
+void vasi_suspend_session_init(struct papr_lpar_suspend_session *s, u64 handle,
 			       const struct papr_suspend_ops *ops)
 {
 	*s = (struct papr_lpar_suspend_session) {
@@ -101,7 +101,7 @@ static void step_state(struct papr_lpar_suspend_session *session, vasi_suspend_s
 	}
 }
 
-int papr_suspend_lpar(struct papr_lpar_suspend_session *session)
+int vasi_suspend_session_run(struct papr_lpar_suspend_session *session)
 {
 	while (session->state != LPAR_SUSPEND_DONE) {
 		vasi_suspend_state_t vasi_state;
@@ -122,7 +122,7 @@ int papr_suspend_lpar(struct papr_lpar_suspend_session *session)
 	return session->result;
 }
 
-u32 papr_suspend_abort_code(const struct papr_lpar_suspend_session *session)
+u32 vasi_suspend_session_abort_code(const struct papr_lpar_suspend_session *session)
 {
 	u32 ret;
 

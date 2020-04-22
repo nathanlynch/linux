@@ -160,12 +160,12 @@ static void tc_inner(struct kunit *t,
 		ctx->ops.cancel_suspend = cancel_suspend_fn;
 	ctx->state_seq = vasi_states;
 
-	papr_suspend_session_init(&ctx->session,
+	vasi_suspend_session_init(&ctx->session,
 				  TEST_VASI_STREAM_ID,
 				  &ctx->ops);
 
 	KUNIT_EXPECT_EQ(t, expected_result,
-			papr_suspend_lpar(&ctx->session));
+			vasi_suspend_session_run(&ctx->session));
 	KUNIT_EXPECT_EQ(t, test_state_seq_end,
 			ctx->state_seq[ctx->state_seqno].r4);
 	if (do_suspend_fn != NULL)
@@ -177,7 +177,7 @@ static void tc_inner(struct kunit *t,
 	else
 		KUNIT_EXPECT_FALSE(t, ctx->canceled);
 	if (expected_result != 0) {
-		abort_code = papr_suspend_abort_code(&ctx->session);
+		abort_code = vasi_suspend_session_abort_code(&ctx->session);
 		KUNIT_EXPECT_TRUE(t, abort_code_valid(abort_code));
 	}
 }
