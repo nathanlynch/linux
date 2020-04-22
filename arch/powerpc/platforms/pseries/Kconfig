@@ -160,7 +160,7 @@ config PPC_SVM
 
 	 If unsure, say "N".
 
-config PSERIES_PARTITION_SUSPEND_KUNIT_TEST
+config VASI_SUSPEND_SESSION_KUNIT_TEST
 	tristate "KUnit test for pseries partition suspend code"
 	depends on KUNIT
 	depends on SUSPEND
