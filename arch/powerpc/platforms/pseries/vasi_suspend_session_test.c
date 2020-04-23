@@ -91,27 +91,45 @@ static int poll_vasi_state_shouldnt_call(struct vasi_suspend_session *s,
 	return -EIO;
 }
 
+typedef enum {
+	must_call,
+	must_not_call,
+} must_call_t;
+
+/* Need this for use in KUNIT_* equality macros so types match. */
+static const must_call_t MUST_CALL = must_call;
+static const must_call_t MUST_NOT_CALL = must_not_call;
+
 /* vasi_suspend_session->ops->do_suspend() test doubles */
 
-#define define_do_suspend_fn(fn_name, rc)				\
+static int suspend_stub_common(struct vasi_suspend_session *s,
+			       must_call_t must_call_this_stub, int rc)
+{
+	struct suspend_test_context *ctx;
+
+	ctx = container_of(s, struct suspend_test_context, session);
+
+	KUNIT_EXPECT_EQ(ctx->test, must_call_this_stub, MUST_CALL);
+
+	/* Suspend should be attempted only once. */
+	KUNIT_EXPECT_FALSE(ctx->test, ctx->suspend_called);
+	ctx->suspend_called = true;
+
+	return rc;
+}
+
+#define do_suspend_stub(fn_name, must_call, rc)				\
 	static int fn_name(struct vasi_suspend_session *s)		\
 	{								\
-		struct suspend_test_context *ctx;			\
-									\
-		ctx = container_of(s, struct suspend_test_context,	\
-				   session);				\
-									\
-		/* Suspend should be attempted only once. */		\
-		KUNIT_EXPECT_FALSE(ctx->test, ctx->suspend_called);	\
-		ctx->suspend_called = true;				\
-									\
-		return (rc);						\
+		return suspend_stub_common(s, must_call, rc);		\
 	}
 
-define_do_suspend_fn(do_suspend_success, 0);
-define_do_suspend_fn(do_suspend_enomem, -ENOMEM);
-define_do_suspend_fn(do_suspend_ebusy, -EBUSY);
-define_do_suspend_fn(do_suspend_shouldnt_call, 0);
+do_suspend_stub(do_suspend_shouldnt_call, MUST_NOT_CALL, 0);
+do_suspend_stub(do_suspend_success, MUST_CALL, 0);
+do_suspend_stub(do_suspend_enomem, MUST_CALL, -ENOMEM);
+do_suspend_stub(do_suspend_ebusy, MUST_CALL, -EBUSY);
+
+
 
 /* vasi_suspend_session->ops->cancel_suspend() test doubles */
 
