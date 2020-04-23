@@ -202,6 +202,7 @@ static void tc_inner(struct kunit *t,
 		     const h_vasi_state_result_t *vasi_states)
 {
 	struct suspend_test_context *ctx = t->priv;
+	bool resume_fn_supplied = resume_fn != NULL;
 	u32 abort_code;
 
 	ctx->ops = (struct vasi_suspend_ops) {
@@ -231,7 +232,7 @@ static void tc_inner(struct kunit *t,
 	} else {
 		KUNIT_EXPECT_TRUE(t, ctx->suspend_called);
 		KUNIT_EXPECT_FALSE(t, ctx->canceled);
-		KUNIT_EXPECT_TRUE(t, ctx->resume_called);
+		KUNIT_EXPECT_EQ(t, ctx->resume_called, resume_fn_supplied);
 		KUNIT_EXPECT_TRUE(t, ctx->complete_called);
 	}
 }
@@ -349,6 +350,21 @@ TC(success_each_state_once,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
    resume_stub_must_call,
+   0,
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
+   h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
+
+/*
+ * Each possible suspend state on the "happy path" is encountered
+ * once. Verifies that the state machine does not dereference a NULL
+ * resume callback, which is valid usage.
+ */
+TC(success_each_state_once_no_resume_cb,
+   do_suspend_success,
+   cancel_suspend_shouldnt_call,
+   NULL,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -640,6 +656,7 @@ static struct kunit_case lpar_suspend_tests[] = {
 	KUNIT_CASE(handle_abort_after_enabled),
 	KUNIT_CASE(handle_abort_after_suspending),
 	KUNIT_CASE(success_each_state_once),
+	KUNIT_CASE(success_each_state_once_no_resume_cb),
 	KUNIT_CASE(success_enabled_x10),
 	KUNIT_CASE(success_resumed_x10),
 	KUNIT_CASE(success_skip_resumed),
