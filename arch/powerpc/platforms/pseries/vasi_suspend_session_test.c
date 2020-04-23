@@ -195,6 +195,8 @@ static bool abort_code_valid(u32 code)
 static void tc_inner(struct kunit *t,
 		     int (*do_suspend_fn)(struct vasi_suspend_session *),
 		     int (*cancel_suspend_fn)(struct vasi_suspend_session *),
+		     void (*resume_fn)(struct vasi_suspend_session *),
+		     void (*complete_fn)(struct vasi_suspend_session *),
 		     int expected_result,
 		     const h_vasi_state_result_t *vasi_states)
 {
@@ -260,6 +262,7 @@ static void tc_inner(struct kunit *t,
 	static void tcname(struct kunit *t)				\
 	{								\
 		tc_inner(t, do_suspend_fn, cancel_suspend_fn,		\
+			 NULL, NULL,					\
 			 expected_result, vsl_ ## tcname);		\
 	}
 
