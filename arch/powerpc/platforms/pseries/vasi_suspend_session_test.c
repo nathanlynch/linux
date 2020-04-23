@@ -147,16 +147,28 @@ cancel_suspend_stub(cancel_suspend_shouldnt_call, MUST_NOT_CALL, 0);
 cancel_suspend_stub(cancel_suspend_success, MUST_CALL, 0);
 cancel_suspend_stub(cancel_suspend_einval, MUST_CALL, -EINVAL);
 
-static void resume_stub(struct vasi_suspend_session *s)
+static void resume_stub_common(struct vasi_suspend_session *s,
+			       must_call_t must_call_this_stub)
 {
 	struct suspend_test_context *ctx;
 
 	ctx = container_of(s, struct suspend_test_context, session);
 
+	KUNIT_EXPECT_EQ(ctx->test, must_call_this_stub, MUST_CALL);
+
 	/* Resume callback should be invoked only once. */
 	KUNIT_EXPECT_FALSE(ctx->test, ctx->resume_called);
 	ctx->resume_called = true;
 }
+
+#define resume_stub(fn_name, must_call) \
+	static void fn_name(struct vasi_suspend_session *s)	\
+	{							\
+		resume_stub_common(s, must_call);		\
+	}
+
+resume_stub(resume_stub_must_not_call, MUST_NOT_CALL);
+resume_stub(resume_stub_must_call, MUST_CALL);
 
 static void complete_stub(struct vasi_suspend_session *s)
 {
@@ -229,12 +241,18 @@ static void tc_inner(struct kunit *t,
  *
  * @name: Name of the testcase, to be passed to KUNIT_CASE()
  *
- * @do_suspend_fn: do_suspend() callback to use. Should be NULL if the
- *                 testcase is expected to not invoke a do_suspend() callback.
+ * @do_suspend_fn: do_suspend() callback to use. Should be
+ *                 do_suspend_shouldnt_call() if the testcase is
+ *                 expected to not invoke a do_suspend() callback.
  *
- * @cancel_suspend_fn: cancel_suspend() callback to use. Should be NULL if the
- *                     testcase is expected to not invoke a @cancel_suspend
+ * @cancel_suspend_fn: cancel_suspend() callback to use. Should be
+ *                     cancel_suspend_shouldnt_call() if the testcase
+ *                     is expected to not invoke a @cancel_suspend
  *                     callback.
+ *
+ * @resume_fn: resume() callback to use. Should be
+ *                      resume_stub_must_not_call() if the testcase is
+ *                      expected to not invoke the callback.
  *
  * @expected_result: Expected result of papr_suspend_lpar().
  *
@@ -243,13 +261,14 @@ static void tc_inner(struct kunit *t,
 #define TC(tcname,							\
 	   do_suspend_fn,						\
 	   cancel_suspend_fn,						\
+	   resume_fn,							\
 	   expected_result,						\
 	   ...)								\
 	static const V3S(vsl_ ## tcname, ##__VA_ARGS__);		\
 	static void tcname(struct kunit *t)				\
 	{								\
 		tc_inner(t, do_suspend_fn, cancel_suspend_fn,		\
-			 resume_stub, complete_stub,			\
+			 resume_fn, complete_stub,			\
 			 expected_result, vsl_ ## tcname);		\
 	}
 
@@ -259,18 +278,21 @@ static void tc_inner(struct kunit *t,
 TC(handle_immediate_invalid,
    do_suspend_shouldnt_call,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_not_call,
    -EINVAL,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
 TC(handle__h_vasi_state__h_parameter,
    do_suspend_shouldnt_call,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_not_call,
    -EINVAL,
    h_vasi_state__err(H_PARAMETER));
 
 TC(handle__h_vasi_state__h_hardware,
    do_suspend_shouldnt_call,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_not_call,
    -EIO,
    h_vasi_state__err(H_HARDWARE));
 
@@ -281,6 +303,7 @@ TC(handle__h_vasi_state__h_hardware,
 TC(handle_invalid_after_suspending,
    do_suspend_ebusy,
    cancel_suspend_success,
+   resume_stub_must_not_call,
    -EBUSY,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -289,6 +312,7 @@ TC(handle_invalid_after_suspending,
 TC(handle_h_hardware_after_enabled,
    do_suspend_shouldnt_call,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_not_call,
    -EIO,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__err(H_HARDWARE));
@@ -299,6 +323,7 @@ TC(handle_h_hardware_after_enabled,
 TC(handle_abort_after_enabled,
    do_suspend_shouldnt_call,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_not_call,
    -ECANCELED,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
@@ -310,6 +335,7 @@ TC(handle_abort_after_enabled,
 TC(handle_abort_after_suspending,
    do_suspend_ebusy,
    cancel_suspend_success,
+   resume_stub_must_not_call,
    -EBUSY,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -322,6 +348,7 @@ TC(handle_abort_after_suspending,
 TC(success_each_state_once,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -336,6 +363,7 @@ TC(success_each_state_once,
 TC(success_enabled_x10,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
@@ -358,6 +386,7 @@ TC(success_enabled_x10,
 TC(success_resumed_x10,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -380,6 +409,7 @@ TC(success_resumed_x10,
 TC(success_skip_resumed,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -392,6 +422,7 @@ TC(success_skip_resumed,
 TC(success_skip_enabled,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
@@ -404,6 +435,7 @@ TC(success_skip_enabled,
 TC(success_fewest_states,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
@@ -415,6 +447,7 @@ TC(success_fewest_states,
 TC(handle_immediate_abort,
    do_suspend_shouldnt_call,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_not_call,
    -ECANCELED,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
 
@@ -425,6 +458,7 @@ TC(handle_immediate_abort,
 TC(handle_enomem_from_suspend,
    do_suspend_enomem,
    cancel_suspend_success,
+   resume_stub_must_not_call,
    -ENOMEM,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -440,6 +474,7 @@ TC(handle_enomem_from_suspend,
 TC(handle_enomem_from_suspend_and_einval_from_cancel,
    do_suspend_enomem,
    cancel_suspend_einval,
+   resume_stub_must_not_call,
    -ENOMEM,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING));
@@ -458,6 +493,7 @@ TC(handle_enomem_from_suspend_and_einval_from_cancel,
 TC(handle_invalid_after_resume,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
@@ -465,6 +501,7 @@ TC(handle_invalid_after_resume,
 TC(handle_resumed_after_enabled,
    do_suspend_shouldnt_call,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_not_call,
    -EIO,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED));
@@ -472,6 +509,7 @@ TC(handle_resumed_after_enabled,
 TC(generated__aborted,
    do_suspend_shouldnt_call,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_not_call,
    -ECANCELED,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
 
@@ -480,6 +518,7 @@ TC(generated__aborted,
 TC(generated__enabled_aborted,
    do_suspend_shouldnt_call,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_not_call,
    -ECANCELED,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
@@ -487,6 +526,7 @@ TC(generated__enabled_aborted,
 TC(generated__enabled_invalid,
    do_suspend_shouldnt_call,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_not_call,
    -EINVAL,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
@@ -494,6 +534,7 @@ TC(generated__enabled_invalid,
 TC(generated__enabled_suspending_aborted,
    do_suspend_ebusy,
    cancel_suspend_success,
+   resume_stub_must_not_call,
    -EBUSY,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -502,6 +543,7 @@ TC(generated__enabled_suspending_aborted,
 TC(generated__enabled_suspending_completed,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -510,6 +552,7 @@ TC(generated__enabled_suspending_completed,
 TC(generated__enabled_suspending_invalid,
    do_suspend_ebusy,
    cancel_suspend_success,
+   resume_stub_must_not_call,
    -EBUSY,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -518,6 +561,7 @@ TC(generated__enabled_suspending_invalid,
 TC(generated__enabled_suspending_resumed_completed,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -527,6 +571,7 @@ TC(generated__enabled_suspending_resumed_completed,
 TC(generated__enabled_suspending_resumed_invalid,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ENABLED),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
@@ -538,6 +583,7 @@ TC(generated__enabled_suspending_resumed_invalid,
 TC(generated__invalid,
    do_suspend_shouldnt_call,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_not_call,
    -EINVAL,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
 
@@ -546,6 +592,7 @@ TC(generated__invalid,
 TC(generated__suspending_aborted,
    do_suspend_ebusy,
    cancel_suspend_success,
+   resume_stub_must_not_call,
    -EBUSY,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_ABORTED));
@@ -553,6 +600,7 @@ TC(generated__suspending_aborted,
 TC(generated__suspending_completed,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_COMPLETED));
@@ -560,6 +608,7 @@ TC(generated__suspending_completed,
 TC(generated__suspending_invalid,
    do_suspend_ebusy,
    cancel_suspend_success,
+   resume_stub_must_not_call,
    -EBUSY,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_INVALID));
@@ -567,6 +616,7 @@ TC(generated__suspending_invalid,
 TC(generated__suspending_resumed_completed,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
@@ -575,6 +625,7 @@ TC(generated__suspending_resumed_completed,
 TC(generated__suspending_resumed_invalid,
    do_suspend_success,
    cancel_suspend_shouldnt_call,
+   resume_stub_must_call,
    0,
    h_vasi_state__h_success(VASI_SUSPEND_STATE_SUSPENDING),
    h_vasi_state__h_success(VASI_SUSPEND_STATE_RESUMED),
