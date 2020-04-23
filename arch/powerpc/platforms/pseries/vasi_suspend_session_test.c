@@ -203,6 +203,11 @@ static void tc_inner(struct kunit *t,
 	if (expected_result != 0) {
 		abort_code = vasi_suspend_session_abort_code(&ctx->session);
 		KUNIT_EXPECT_TRUE(t, abort_code_valid(abort_code));
+		KUNIT_EXPECT_FALSE(t, ctx->resume_called);
+		KUNIT_EXPECT_FALSE(t, ctx->complete_called);
+	} else {
+		KUNIT_EXPECT_TRUE(t, ctx->resume_called);
+		KUNIT_EXPECT_TRUE(t, ctx->complete_called);
 	}
 }
 

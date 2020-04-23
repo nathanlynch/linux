@@ -37,6 +37,8 @@ static void step_state(struct vasi_suspend_session *session, vasi_suspend_state_
 					       "failed with %i\n", ret);
 					session->state = LPAR_SUSPEND_DONE;
 				}
+			} else {
+				session->ops->resume(session);
 			}
 			break;
 		case VASI_SUSPEND_STATE_ABORTED:
@@ -116,6 +118,10 @@ int vasi_suspend_session_run(struct vasi_suspend_session *session)
 		}
 
 		step_state(session, vasi_state);
+	}
+
+	if (session->result == 0) {
+		session->ops->complete(session);
 	}
 
 	return session->result;
