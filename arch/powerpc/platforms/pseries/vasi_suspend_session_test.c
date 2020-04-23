@@ -129,28 +129,34 @@ do_suspend_stub(do_suspend_success, MUST_CALL, 0);
 do_suspend_stub(do_suspend_enomem, MUST_CALL, -ENOMEM);
 do_suspend_stub(do_suspend_ebusy, MUST_CALL, -EBUSY);
 
-
-
 /* vasi_suspend_session->ops->cancel_suspend() test doubles */
 
-#define define_cancel_suspend_fn(fn_name, rc)				\
+static int cancel_suspend_stub_common(struct vasi_suspend_session *s,
+				      must_call_t must_call_this_stub, int rc)
+{
+	struct suspend_test_context *ctx;
+
+	ctx = container_of(s, struct suspend_test_context,
+			   session);
+
+	KUNIT_EXPECT_EQ(ctx->test, must_call_this_stub, MUST_CALL);
+
+	/* Cancellation should be attempted only once. */
+	KUNIT_EXPECT_FALSE(ctx->test, ctx->canceled);
+	ctx->canceled = true;
+
+	return rc;
+}
+
+#define cancel_suspend_stub(fn_name, must_call, rc)			\
 	static int fn_name(struct vasi_suspend_session *s)		\
 	{								\
-		struct suspend_test_context *ctx;			\
-									\
-		ctx = container_of(s, struct suspend_test_context,	\
-				   session);				\
-									\
-		/* Cancellation should be attempted only once. */	\
-		KUNIT_EXPECT_FALSE(ctx->test, ctx->canceled);		\
-		ctx->canceled = true;					\
-									\
-		return (rc);						\
+		return cancel_suspend_stub_common(s, must_call, rc);	\
 	}
 
-define_cancel_suspend_fn(cancel_suspend_success, 0);
-define_cancel_suspend_fn(cancel_suspend_einval, -EINVAL);
-define_cancel_suspend_fn(cancel_suspend_shouldnt_call, 0);
+cancel_suspend_stub(cancel_suspend_shouldnt_call, MUST_NOT_CALL, 0);
+cancel_suspend_stub(cancel_suspend_success, MUST_CALL, 0);
+cancel_suspend_stub(cancel_suspend_einval, MUST_CALL, -EINVAL);
 
 static void resume_stub(struct vasi_suspend_session *s)
 {
