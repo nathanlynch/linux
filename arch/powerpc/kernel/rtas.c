@@ -897,6 +897,12 @@ int rtas_ibm_suspend_me(u64 handle)
 
 	return atomic_read(&data.error);
 }
+#else /* CONFIG_PPC_PSERIES */
+int rtas_ibm_suspend_me(u64 handle)
+{
+	return -ENOSYS;
+}
+#endif
 
 /**
  * rtas_call_reentrant() - Used for reentrant rtas calls
@@ -947,13 +953,6 @@ int rtas_call_reentrant(int token, int nargs, int nret, int *outputs, ...)
 
 	return ret;
 }
-
-#else /* CONFIG_PPC_PSERIES */
-int rtas_ibm_suspend_me(u64 handle)
-{
-	return -ENOSYS;
-}
-#endif
 
 /**
  * Find a specific pseries error log in an RTAS extended event log.
