@@ -345,6 +345,73 @@ void post_mobility_fixup(void)
 	return;
 }
 
+static int poll_vasi_state(u64 handle, unsigned long *res)
+{
+	unsigned long retbuf[PLPAR_HCALL_BUFSIZE];
+	long hvrc;
+	int ret;
+
+	hvrc = plpar_hcall(H_VASI_STATE, retbuf, handle);
+	switch (hvrc) {
+	case H_SUCCESS:
+		ret = 0;
+		*res = retbuf[0];
+		break;
+	case H_PARAMETER:
+		ret = -EINVAL;
+		break;
+	case H_FUNCTION:
+		ret = -EOPNOTSUPP;
+		break;
+	case H_HARDWARE:
+	default:
+		pr_err("unexpected H_VASI_STATE result %ld\n", hvrc);
+		ret = -EIO;
+		break;
+	}
+	return ret;
+}
+
+static int wait_for_vasi_session_suspending(u64 handle)
+{
+	unsigned long state;
+	bool keep_polling;
+	int ret;
+
+	/*
+	 * Wait for transition from H_VASI_ENABLED to
+	 * H_VASI_SUSPENDING. Treat anything else as an error.
+	 */
+	do {
+		keep_polling = false;
+		ret = poll_vasi_state(handle, &state);
+		if (ret != 0)
+			break;
+
+		switch (state) {
+		case H_VASI_SUSPENDING:
+			break;
+		case H_VASI_ENABLED:
+			keep_polling = true;
+			ssleep(1);
+			break;
+		default:
+			pr_err("unexpected H_VASI_STATE result %lu\n", state);
+			ret = -EIO;
+			break;
+		}
+	} while (keep_polling);
+
+	/*
+	 * Proceed even if H_VASI_STATE is unavailable. If H_JOIN or
+	 * ibm,suspend-me are also unimplemented, we'll recover then.
+	 */
+	if (ret == -EOPNOTSUPP)
+		ret = 0;
+
+	return ret;
+}
+
 static ssize_t migration_store(struct class *class,
 			       struct class_attribute *attr, const char *buf,
 			       size_t count)
@@ -356,12 +423,11 @@ static ssize_t migration_store(struct class *class,
 	if (rc)
 		return rc;
 
-	do {
-		rc = rtas_ibm_suspend_me_unsafe(streamid);
-		if (rc == -EAGAIN)
-			ssleep(1);
-	} while (rc == -EAGAIN);
+	rc = wait_for_vasi_session_suspending(streamid);
+	if (rc)
+		return rc;
 
+	rc = rtas_ibm_suspend_me_unsafe(streamid);
 	if (rc)
 		return rc;
 
