@@ -1221,6 +1221,12 @@ static bool block_rtas_call(int token, int nargs,
 
 #endif /* CONFIG_PPC_RTAS_FILTER */
 
+/* Only pseries should need to override this. */
+int __weak rtas_syscall_dispatch_ibm_suspend_me(u64 handle)
+{
+	return -EINVAL;
+}
+
 /* We assume to be passed big endian arguments */
 SYSCALL_DEFINE1(rtas, struct rtas_args __user *, uargs)
 {
@@ -1271,7 +1277,7 @@ SYSCALL_DEFINE1(rtas, struct rtas_args __user *, uargs)
 		int rc = 0;
 		u64 handle = ((u64)be32_to_cpu(args.args[0]) << 32)
 		              | be32_to_cpu(args.args[1]);
-		rc = rtas_ibm_suspend_me_unsafe(handle);
+		rc = rtas_syscall_dispatch_ibm_suspend_me(handle);
 		if (rc == -EAGAIN)
 			args.rets[0] = cpu_to_be32(RTAS_NOT_SUSPENDABLE);
 		else if (rc == -EIO)
