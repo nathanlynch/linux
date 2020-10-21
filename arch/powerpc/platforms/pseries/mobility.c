@@ -622,6 +622,11 @@ out:
 	return ret;
 }
 
+int rtas_syscall_dispatch_ibm_suspend_me(u64 handle)
+{
+	return pseries_migrate_partition(handle);
+}
+
 static ssize_t migration_store(struct class *class,
 			       struct class_attribute *attr, const char *buf,
 			       size_t count)
