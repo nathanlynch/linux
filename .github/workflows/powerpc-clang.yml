@@ -1,4 +1,4 @@
-name: powerpc/clang
+name: powerpc/clang hi I changed the name
 
 # Controls when the action will run.
 on:
