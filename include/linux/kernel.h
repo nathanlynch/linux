@@ -2,8 +2,6 @@
 #ifndef _LINUX_KERNEL_H
 #define _LINUX_KERNEL_H
 
-break the build
-
 #include <stdarg.h>
 #include <linux/limits.h>
 #include <linux/linkage.h>
