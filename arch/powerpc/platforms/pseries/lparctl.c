@@ -8,52 +8,78 @@
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
-#include <linux/kernel.h>
 #include <linux/miscdevice.h>
+#include <linux/slab.h>
+#include <linux/string.h>
 #include <asm/lparctl.h>
 #include <asm/machdep.h>
 #include <asm/rtas.h>
 
 static long lparctl_get_sysparm(unsigned long arg)
 {
-	struct lparctl_getset_system_parameter *udesc = u64_to_user_ptr((u64)arg);
-	struct lparctl_getset_system_parameter kdesc;
+	struct lparctl_get_system_parameter *gsp;
 	long ret;
 	int fwrc;
 
-	if (copy_from_user(&kdesc, udesc, sizeof(kdesc)))
-		return -EFAULT;
+	/*
+	 * Special case to allow user space to probe the command.
+	 */
+	if (arg == 0)
+		return 0;
 
-	pr_info("arg = 0x%llx\n", (unsigned long long)arg);
-	pr_info("arg->(addr=0x%llx, size=0x%x, param=%d)\n",
-		kdesc.userbuf_addr, kdesc.userbuf_size, kdesc.parameter);
-
-
-	spin_lock(&rtas_data_buf_lock);
-	memset(rtas_data_buf, 0, RTAS_DATA_BUF_SIZE);
-
-	/* fixme: copy_*_user under spinlock - bad */
-	if (copy_from_user(rtas_data_buf, u64_to_user_ptr(kdesc.userbuf_addr),
-			   min(4002UL, (unsigned long)kdesc.userbuf_size))) {
-		ret = -EFAULT;
-		goto unlock;
+	gsp = memdup_user(u64_to_user_ptr((u64)arg), sizeof(*gsp));
+	if (IS_ERR(gsp)) {
+		ret = PTR_ERR(gsp);
+		goto err_return;
 	}
-	fwrc = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1, NULL,
-			 kdesc.parameter, __pa(rtas_data_buf), RTAS_DATA_BUF_SIZE);
-	if (fwrc != 0) {
-		/* todo: map return value to errno */
-		pr_err("sysparm token %d got RTAS rc %d\n", kdesc.parameter, fwrc);
+
+	ret = -EINVAL;
+	if (gsp->pad != 0)
+		goto err_free;
+
+	do {
+		static_assert(sizeof(gsp->data) <= sizeof(rtas_data_buf));
+
+		spin_lock(&rtas_data_buf_lock);
+		memcpy(rtas_data_buf, gsp->data, sizeof(gsp->data));
+		fwrc = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
+				 NULL, gsp->token, __pa(rtas_data_buf));
+		memcpy(gsp->data, rtas_data_buf, sizeof(gsp->data));
+		spin_unlock(&rtas_data_buf_lock);
+	} while (rtas_busy_delay(fwrc));
+
+	switch (fwrc) {
+	case 0:
+		ret = 0;
+		break;
+	case -3:
+		/*
+		 * Parameter not supported/implemented on this system.
+		 */
+		ret = -EOPNOTSUPP;
+		break;
+	case -9002:
+		/*
+		 * This partition is not authorized to retrieve the given
+		 * parameter.
+		 */
+		ret = -EPERM;
+		break;
+	case -9999:
+		/*
+		 * Parameter error. Unclear why this would happen, but it's
+		 * in the spec.
+		 */
+		ret = -EINVAL;
+		break;
+	case -1:
+	default:
 		ret = -EIO;
-		goto unlock;
+		break;
 	}
-	if (copy_to_user(u64_to_user_ptr(kdesc.userbuf_addr), rtas_data_buf,
-			 min(4002UL, (unsigned long)kdesc.userbuf_size))) {
-		ret = -EFAULT;
-		goto unlock;
-	}
-	ret = 0;
-unlock:
-	spin_unlock(&rtas_data_buf_lock);
+err_free:
+	kfree(gsp);
+err_return:
 	return ret;
 }
 
@@ -67,6 +93,7 @@ static long lparctl_dev_ioctl(struct file *filp, unsigned int ioctl, unsigned lo
 		ret = lparctl_get_sysparm(arg);
 		break;
 	default:
+		return -ENOIOCTLCMD;
 		break;
 	}
 	return ret;
