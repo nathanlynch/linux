@@ -4,6 +4,7 @@
  * facilities.
  */
 #define pr_fmt(fmt) "lparctl: " fmt
+#define DEBUG
 
 #include <linux/fs.h>
 #include <linux/init.h>
@@ -43,11 +44,18 @@ static long lparctl_get_sysparm(unsigned long arg)
 		static_assert(sizeof(gsp->data) <= sizeof(rtas_data_buf));
 
 		spin_lock(&rtas_data_buf_lock);
+		pr_devel("memcpy(%p, %p, %zu)\n", rtas_data_buf, gsp->data,
+			 sizeof(gsp->data));
+		memset(rtas_data_buf, 0, sizeof(rtas_data_buf));
 		memcpy(rtas_data_buf, gsp->data, sizeof(gsp->data));
 		fwrc = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
 				 NULL, gsp->token, __pa(rtas_data_buf));
+		pr_devel("memcpy(%p, %p, %zu)\n", gsp->data, rtas_data_buf,
+			 sizeof(gsp->data));
 		memcpy(gsp->data, rtas_data_buf, sizeof(gsp->data));
 		spin_unlock(&rtas_data_buf_lock);
+
+		pr_devel("fwrc = %d\n", fwrc);
 	} while (rtas_busy_delay(fwrc));
 
 	switch (fwrc) {
@@ -84,6 +92,7 @@ static long lparctl_get_sysparm(unsigned long arg)
 err_free:
 	kfree(gsp);
 err_return:
+	pr_devel("%s -> %ld\n", __func__, ret);
 	return ret;
 }
 
@@ -93,11 +102,11 @@ static long lparctl_dev_ioctl(struct file *filp, unsigned int ioctl, unsigned lo
 
 	switch(ioctl) {
 	case LPARCTL_GET_SYSPARM:
-		pr_info("got get-sysparm command\n");
+		pr_devel("got get-sysparm command\n");
 		ret = lparctl_get_sysparm(arg);
 		break;
 	default:
-		return -ENOIOCTLCMD;
+		ret = -ENOIOCTLCMD;
 		break;
 	}
 	return ret;
