@@ -49,7 +49,8 @@ static long lparctl_get_sysparm(unsigned long arg)
 		memset(rtas_data_buf, 0, sizeof(rtas_data_buf));
 		memcpy(rtas_data_buf, gsp->data, sizeof(gsp->data));
 		fwrc = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
-				 NULL, gsp->token, __pa(rtas_data_buf));
+				 NULL, gsp->token, __pa(rtas_data_buf),
+				 sizeof(gsp->data));
 		pr_devel("memcpy(%p, %p, %zu)\n", gsp->data, rtas_data_buf,
 			 sizeof(gsp->data));
 		memcpy(gsp->data, rtas_data_buf, sizeof(gsp->data));
