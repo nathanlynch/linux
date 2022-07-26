@@ -18,6 +18,7 @@
 static long lparctl_get_sysparm(unsigned long arg)
 {
 	struct lparctl_get_system_parameter *gsp;
+	void __user *uptr;
 	long ret;
 	int fwrc;
 
@@ -27,7 +28,8 @@ static long lparctl_get_sysparm(unsigned long arg)
 	if (arg == 0)
 		return 0;
 
-	gsp = memdup_user(u64_to_user_ptr((u64)arg), sizeof(*gsp));
+	uptr = u64_to_user_ptr((u64)arg);
+	gsp = memdup_user(uptr, sizeof(*gsp));
 	if (IS_ERR(gsp)) {
 		ret = PTR_ERR(gsp);
 		goto err_return;
@@ -51,6 +53,8 @@ static long lparctl_get_sysparm(unsigned long arg)
 	switch (fwrc) {
 	case 0:
 		ret = 0;
+		if (copy_to_user(uptr, gsp, sizeof(*gsp)))
+			ret = -EFAULT;
 		break;
 	case -3:
 		/*
