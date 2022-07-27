@@ -2,7 +2,6 @@
 #ifndef POWERPC_UAPI_LPARCTL_H
 #define POWERPC_UAPI_LPARCTL_H
 
-#include <linux/build_bug.h>
 #include <linux/ioctl.h>
 #include <linux/types.h>
 
@@ -24,8 +23,8 @@
  *        parameter on return.
  */
 struct lparctl_get_system_parameter {
-	__u32 token;
-	__u16 pad;
+	__s32 rtas_status;
+	__u16 token;
 	union {
 		/* Result as returned from firmware. */
 		__be16 length;

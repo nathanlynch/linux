@@ -6,6 +6,7 @@
 #define pr_fmt(fmt) "lparctl: " fmt
 #define DEBUG
 
+#include <linux/build_bug.h>
 #include <linux/fs.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
@@ -16,6 +17,32 @@
 #include <asm/machdep.h>
 #include <asm/rtas.h>
 
+/**
+ * lparctl_get_sysparm() - Query a PAPR system parameter.
+ *
+ * Retrieve the value of the parameter indicated by the @token member of
+ * the &struct lparctl_get_system_parameter at @arg. If available and
+ * accessible, the value of the parameter is copied to the @data member of
+ * the &struct lparctl_get_system_parameter at @arg, and its @rtas_status
+ * field is set to zero. Otherwise, the @rtas_status member reflects the
+ * most recent RTAS call status, and the contents of @data are
+ * indeterminate.
+ *
+ * Non-zero RTAS call statuses are not translated to conventional errno
+ * values. Only kernel issues or API misuse result in an error at the
+ * syscall level. This is to serve the needs of legacy software which
+ * historically has accessed system parameters via the rtas() syscall,
+ * which has similar behavior.
+ *
+ * Return:
+ * * 0 - OK. Caller must examine the @rtas_status member of the returned
+ *       &struct lparctl_get_system_parameter to determine whether a parameter
+ *       value was copied out.
+ * * -EINVAL - The copied-in &struct lparctl_get_system_parameter.rtas_status
+ *             is non-zero.
+ * * -EFAULT - The supplied @arg is a bad address.
+ * * -ENOMEM - Allocation failure.
+ */
 static long lparctl_get_sysparm(unsigned long arg)
 {
 	struct lparctl_get_system_parameter *gsp;
@@ -37,59 +64,29 @@ static long lparctl_get_sysparm(unsigned long arg)
 	}
 
 	ret = -EINVAL;
-	if (gsp->pad != 0)
+	if (gsp->rtas_status != 0)
 		goto err_free;
 
 	do {
 		static_assert(sizeof(gsp->data) <= sizeof(rtas_data_buf));
 
 		spin_lock(&rtas_data_buf_lock);
-		pr_devel("memcpy(%p, %p, %zu)\n", rtas_data_buf, gsp->data,
-			 sizeof(gsp->data));
 		memset(rtas_data_buf, 0, sizeof(rtas_data_buf));
 		memcpy(rtas_data_buf, gsp->data, sizeof(gsp->data));
 		fwrc = rtas_call(rtas_token("ibm,get-system-parameter"), 3, 1,
 				 NULL, gsp->token, __pa(rtas_data_buf),
 				 sizeof(gsp->data));
-		pr_devel("memcpy(%p, %p, %zu)\n", gsp->data, rtas_data_buf,
-			 sizeof(gsp->data));
-		memcpy(gsp->data, rtas_data_buf, sizeof(gsp->data));
+		if (fwrc == 0)
+			memcpy(gsp->data, rtas_data_buf, sizeof(gsp->data));
 		spin_unlock(&rtas_data_buf_lock);
-
-		pr_devel("fwrc = %d\n", fwrc);
+		pr_devel("get-system-parameter(%u) -> fwrc = %d\n",
+			 gsp->token, fwrc);
 	} while (rtas_busy_delay(fwrc));
 
-	switch (fwrc) {
-	case 0:
-		ret = 0;
-		if (copy_to_user(uptr, gsp, sizeof(*gsp)))
-			ret = -EFAULT;
-		break;
-	case -3:
-		/*
-		 * Parameter not supported/implemented on this system.
-		 */
-		ret = -EOPNOTSUPP;
-		break;
-	case -9002:
-		/*
-		 * This partition is not authorized to retrieve the given
-		 * parameter.
-		 */
-		ret = -EPERM;
-		break;
-	case -9999:
-		/*
-		 * Parameter error. Unclear why this would happen, but it's
-		 * in the spec.
-		 */
-		ret = -EINVAL;
-		break;
-	case -1:
-	default:
-		ret = -EIO;
-		break;
-	}
+	gsp->rtas_status = fwrc;
+	ret = 0;
+	if (copy_to_user(uptr, gsp, sizeof(*gsp)))
+		ret = -EFAULT;
 err_free:
 	kfree(gsp);
 err_return:
