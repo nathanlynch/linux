@@ -24,6 +24,53 @@
 #include <asm/rtas.h>
 #include <asm/rtas-work-area.h>
 
+struct config_conn_params {
+	struct rtas_work_area *work_area;
+	u32 parent_index;
+	s32 status;
+};
+
+static int rtas_ibm_configure_connector(struct config_conn_params *params)
+{
+	const s32 token = rtas_function_token(RTAS_FN_IBM_CONFIGURE_CONNECTOR);
+
+	/*
+	 * Callers should test for this before invoking a sequence.
+	 */
+	if (WARN_ON(token == RTAS_UNKNOWN_SERVICE))
+		return -EIO;
+
+	/*
+	 * FIXME: initialize work area with parent index on first
+	 * call, or leave to caller?
+	 */
+
+	do {
+		/*
+		 * The additional page parameter is under-specified in
+		 * PAPR+, and it's never requested by PowerVM RTAS.
+		 */
+		phys_addr_t addl_page = 0;
+
+		params->status = rtas_call(token, 2, 1, NULL,
+					   rtas_work_area_phys(params->work_area),
+					   addl_page);
+	} while (rtas_busy_delay(params->status));
+
+	// todo: map status to errno
+	return params->status < 0 ? -EIO : 0;
+}
+
+static int run_ibmcc_sequence(void)
+{
+	
+}
+
+static int dlpar_add(u32 parent_drc)
+{
+	
+}
+
 static struct workqueue_struct *pseries_hp_wq;
 
 struct pseries_hp_work {
