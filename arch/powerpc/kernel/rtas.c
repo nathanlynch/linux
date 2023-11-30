@@ -935,34 +935,33 @@ static void __init init_error_log_max(void)
 }
 
 
-static char rtas_err_buf[RTAS_ERROR_LOG_MAX];
-
 /** Return a copy of the detailed error text associated with the
  *  most recent failed call to rtas.  Because the error text
  *  might go stale if there are any other intervening rtas calls,
  *  this routine must be called atomically with whatever produced
  *  the error (i.e. with rtas_lock still held from the previous call).
  */
-static char *__fetch_rtas_last_error(char *altbuf)
+static char *rtas_get_errbuf(void) __must_hold(&rtas_lock)
 {
-	const s32 token = rtas_function_token(RTAS_FN_RTAS_LAST_ERROR);
-	struct rtas_args err_args, save_args;
-	u32 bufsz;
-	char *buf = NULL;
+	static char rtas_err_buf[RTAS_ERROR_LOG_MAX];
+	char *buf = rtas_err_buf;
+	s32 last_error_status;
+	struct rtas_args save_args;
+	struct rtas_args err_args = {
+		.token = cpu_to_be32(rtas_function_token(RTAS_FN_RTAS_LAST_ERROR)),
+		.nargs = cpu_to_be32(2),
+		.nret = cpu_to_be32(1),
+		.args = {
+			[0] = cpu_to_be32(__pa(rtas_err_buf)),
+			[1] = cpu_to_be32(sizeof(rtas_err_buf)),
+			[2] = 0,
+		},
+	};
 
 	lockdep_assert_held(&rtas_lock);
 
-	if (token == -1)
+	if (err_args.token == RTAS_UNKNOWN_SERVICE)
 		return NULL;
-
-	bufsz = rtas_get_error_log_max();
-
-	err_args.token = cpu_to_be32(token);
-	err_args.nargs = cpu_to_be32(2);
-	err_args.nret = cpu_to_be32(1);
-	err_args.args[0] = cpu_to_be32(__pa(rtas_err_buf));
-	err_args.args[1] = cpu_to_be32(bufsz);
-	err_args.args[2] = 0;
 
 	save_args = rtas_args;
 	rtas_args = err_args;
@@ -972,27 +971,42 @@ static char *__fetch_rtas_last_error(char *altbuf)
 	err_args = rtas_args;
 	rtas_args = save_args;
 
-	/* Log the error in the unlikely case that there was one. */
-	if (unlikely(err_args.args[2] == 0)) {
-		if (altbuf) {
-			buf = altbuf;
-		} else {
-			buf = rtas_err_buf;
-			if (slab_is_available())
-				buf = kmalloc(RTAS_ERROR_LOG_MAX, GFP_ATOMIC);
+	last_error_status = err_args.args[2];
+
+	switch (last_error_status) {
+	case 1: /* No errors found. */
+		buf = NULL;
+		break;
+	case 0:
+		if (slab_is_available()) {
+			buf = kmalloc(sizeof(rtas_err_buf), GFP_ATOMIC);
+			if (buf)
+				memcpy(buf, rtas_err_buf, sizeof(rtas_err_buf));
+			memset(rtas_err_buf, 0, sizeof(rtas_err_buf));
 		}
-		if (buf)
-			memmove(buf, rtas_err_buf, RTAS_ERROR_LOG_MAX);
+		break;
+	case -1:
+	default:
+		pr_err("rtas-last-error failed with status %d\n",
+		       last_error_status);
+		break;
 	}
 
 	return buf;
 }
 
-#define get_errorlog_buffer()	kmalloc(RTAS_ERROR_LOG_MAX, GFP_KERNEL)
+static void rtas_release_errbuf(char *buf)
+{
+	if (slab_is_available())
+		kfree(buf);
+}
 
 #else /* CONFIG_RTAS_ERROR_LOGGING */
-#define __fetch_rtas_last_error(x)	NULL
-#define get_errorlog_buffer()		NULL
+static char *rtas_get_errbuf(void)
+{
+	return NULL;
+}
+static void rtas_release_errbuf(char *buf) {}
 static void __init init_error_log_max(void) {}
 #endif
 
@@ -1114,7 +1128,7 @@ int rtas_call(int token, int nargs, int nret, int *outputs, ...)
 	int i;
 	unsigned long flags;
 	struct rtas_args *args;
-	char *buff_copy = NULL;
+	char *errbuf = NULL;
 	int ret;
 
 	if (!rtas.entry || token == RTAS_UNKNOWN_SERVICE)
@@ -1148,7 +1162,7 @@ int rtas_call(int token, int nargs, int nret, int *outputs, ...)
 	/* A -1 return code indicates that the last command couldn't
 	   be completed due to a hardware error. */
 	if (be32_to_cpu(args->rets[0]) == -1)
-		buff_copy = __fetch_rtas_last_error(NULL);
+		errbuf = rtas_get_errbuf();
 
 	if (nret > 1 && outputs != NULL)
 		for (i = 0; i < nret-1; ++i)
@@ -1158,10 +1172,9 @@ int rtas_call(int token, int nargs, int nret, int *outputs, ...)
 	lockdep_unpin_lock(&rtas_lock, cookie);
 	raw_spin_unlock_irqrestore(&rtas_lock, flags);
 
-	if (buff_copy) {
-		log_error(buff_copy, ERR_TYPE_RTAS_LOG, 0);
-		if (slab_is_available())
-			kfree(buff_copy);
+	if (errbuf) {
+		log_error(errbuf, ERR_TYPE_RTAS_LOG, 0);
+		rtas_release_errbuf(errbuf);
 	}
 	return ret;
 }
@@ -1793,7 +1806,7 @@ SYSCALL_DEFINE1(rtas, struct rtas_args __user *, uargs)
 	struct pin_cookie cookie;
 	struct rtas_args args;
 	unsigned long flags;
-	char *buff_copy, *errbuf = NULL;
+	char *errbuf;
 	int nargs, nret, token;
 
 	if (!capable(CAP_SYS_ADMIN))
@@ -1856,7 +1869,6 @@ SYSCALL_DEFINE1(rtas, struct rtas_args __user *, uargs)
 		goto copy_return;
 	}
 
-	buff_copy = get_errorlog_buffer();
 
 	raw_spin_lock_irqsave(&rtas_lock, flags);
 	cookie = lockdep_pin_lock(&rtas_lock);
@@ -1868,15 +1880,14 @@ SYSCALL_DEFINE1(rtas, struct rtas_args __user *, uargs)
 	/* A -1 return code indicates that the last command couldn't
 	   be completed due to a hardware error. */
 	if (be32_to_cpu(args.rets[0]) == -1)
-		errbuf = __fetch_rtas_last_error(buff_copy);
+		errbuf = rtas_get_errbuf();
 
 	lockdep_unpin_lock(&rtas_lock, cookie);
 	raw_spin_unlock_irqrestore(&rtas_lock, flags);
 
-	if (buff_copy) {
-		if (errbuf)
-			log_error(errbuf, ERR_TYPE_RTAS_LOG, 0);
-		kfree(buff_copy);
+	if (errbuf) {
+		log_error(errbuf, ERR_TYPE_RTAS_LOG, 0);
+		rtas_release_errbuf(errbuf);
 	}
 
  copy_return:
