@@ -9,9 +9,9 @@ typedef struct {
 #define mk_papr_sysparm(x_) ((papr_sysparm_t){ .token = x_, })
 
 /*
- * Derived from the "Defined Parameters" table in PAPR 7.3.16 System
- * Parameters Option. Where the spec says "characteristics", we use
- * "attrs" in the symbolic names to keep them from getting too
+ * Derived from the "Defined Parameters" table in PAPR+ v2.13 7.3.16
+ * System Parameters Option. Where the spec says "characteristics", we
+ * use "attrs" in the symbolic names to keep them from getting too
  * unwieldy.
  */
 #define PAPR_SYSPARM_SHARED_PROC_LPAR_ATTRS        mk_papr_sysparm(20)
