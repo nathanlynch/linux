@@ -17,6 +17,7 @@ typedef struct {
 #define PAPR_SYSPARM_SHARED_PROC_LPAR_ATTRS        mk_papr_sysparm(20)
 #define PAPR_SYSPARM_PROC_MODULE_INFO              mk_papr_sysparm(43)
 #define PAPR_SYSPARM_COOP_MEM_OVERCOMMIT_ATTRS     mk_papr_sysparm(44)
+#define PAPR_SYSPARM_CEDE_LATENCY_SETTINGS         mk_papr_sysparm(45)
 #define PAPR_SYSPARM_TLB_BLOCK_INVALIDATE_ATTRS    mk_papr_sysparm(50)
 #define PAPR_SYSPARM_LPAR_NAME                     mk_papr_sysparm(55)
 
