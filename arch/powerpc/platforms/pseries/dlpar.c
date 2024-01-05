@@ -296,25 +296,42 @@ int dlpar_acquire_drc(u32 drc_index)
 	return 0;
 }
 
-int dlpar_release_drc(u32 drc_index)
+int dlpar_release_drc(u32 idx)
 {
-	int dr_status, rc;
+	u32 sensor_state;
+	int err;
 
-	rc = rtas_get_sensor(DR_ENTITY_SENSE, drc_index, &dr_status);
-	if (rc || dr_status != DR_ENTITY_PRESENT)
-		return -1;
+	err = rtas_get_sensor(DR_ENTITY_SENSE, idx, &sensor_state);
+	if (err) {
+		pr_err("release: sensor state error for index 0x%x: %d\n", idx, err);
+		goto error;
+	} else if (sensor_state != DR_ENTITY_PRESENT) {
+		pr_err("release: unexpected sensor state %u for index 0x%x\n", sensor_state, idx);
+		goto error;
+	}
 
-	rc = rtas_set_indicator(ISOLATION_STATE, drc_index, ISOLATE);
-	if (rc)
-		return rc;
+	err = rtas_set_indicator(ISOLATION_STATE, idx, ISOLATE);
+	if (err) {
+		pr_err("release: isolate error for index 0x%x: %d\n", idx, err);
+		goto error;
+	}
 
-	rc = rtas_set_indicator(ALLOCATION_STATE, drc_index, ALLOC_UNUSABLE);
-	if (rc) {
-		rtas_set_indicator(ISOLATION_STATE, drc_index, UNISOLATE);
-		return rc;
+	err = rtas_set_indicator(ALLOCATION_STATE, idx, ALLOC_UNUSABLE);
+	if (err) {
+		pr_err("release: alloc state -> unusable transition error for index 0x%x (%d)\n",
+		       idx, err);
+		goto unisolate;
 	}
 
 	return 0;
+unisolate:
+	int unisolate_err = rtas_set_indicator(ISOLATION_STATE, idx, UNISOLATE);
+	if (unisolate_err) {
+		pr_crit("release: failed to revert isolation state for index 0x%x (%d)\n",
+			idx, unisolate_err);
+	}
+error:
+	return err;
 }
 
 int dlpar_unisolate_drc(u32 drc_index)
