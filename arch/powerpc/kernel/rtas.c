@@ -71,6 +71,7 @@ struct rtas_filter {
  *                            ppc64le, and we want to keep it that way. It does
  *                            not make sense for this to be set when @filter
  *                            is NULL.
+ * @synthetic: Undocumented function with pre-set token.
  * @lock: Pointer to an optional dedicated per-function mutex. This
  *        should be set for functions that require multiple calls in
  *        sequence to complete a single operation, and such sequences
@@ -82,6 +83,7 @@ struct rtas_filter {
 struct rtas_function {
 	s32 token;
 	const bool banned_for_syscall_on_le:1;
+	const bool synthetic:1;
 	const char * const name;
 	const struct rtas_filter *filter;
 	struct mutex *lock;
@@ -522,6 +524,15 @@ static struct rtas_function rtas_function_table[] __ro_after_init = {
 	},
 	[RTAS_FNIDX__WRITE_PCI_CONFIG] = {
 		.name = "write-pci-config",
+	},
+	{
+		.name = "~~~,rtas-debug",
+		.synthetic = true,
+		.token = 0x81,
+		.filter = &(const struct rtas_filter) {
+			.buf_idx1 = -1, .size_idx1 = -1,
+			.buf_idx2 = -1, .size_idx2 = -1,
+		},
 	},
 };
 
@@ -2012,7 +2023,8 @@ static void __init rtas_function_table_init(void)
 		struct rtas_function *prior;
 		int cmp;
 
-		curr->token = RTAS_UNKNOWN_SERVICE;
+		if (!curr->synthetic)
+			curr->token = RTAS_UNKNOWN_SERVICE;
 
 		if (i == 0)
 			continue;
