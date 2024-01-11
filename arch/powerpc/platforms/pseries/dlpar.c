@@ -275,25 +275,44 @@ int dlpar_detach_node(struct device_node *dn)
 #define ISOLATE			0
 #define UNISOLATE		1
 
-int dlpar_acquire_drc(u32 drc_index)
+int dlpar_acquire_drc(u32 idx)
 {
-	int dr_status, rc;
+	u32 sensor_state;
+	int err;
 
-	rc = rtas_get_sensor(DR_ENTITY_SENSE, drc_index, &dr_status);
-	if (rc || dr_status != DR_ENTITY_UNUSABLE)
-		return -1;
+	err = rtas_get_sensor(DR_ENTITY_SENSE, idx, &sensor_state);
+	if (err) {
+		pr_err("acquire: sensor state error for index 0x%x: %d", idx, err);
+		goto error;
+	}
+	if (sensor_state != DR_ENTITY_UNUSABLE) {
+		err = -EIO;
+		pr_err("acquire: unexpected sensor state %u for index 0x%x\n", sensor_state, idx);
+		goto error;
+	}
 
-	rc = rtas_set_indicator(ALLOCATION_STATE, drc_index, ALLOC_USABLE);
-	if (rc)
-		return rc;
+	err = rtas_set_indicator(ALLOCATION_STATE, idx, ALLOC_USABLE);
+	if (err) {
+		pr_err("acquire: alloc state -> usable transition error for index 0x%x (%d)\n",
+		       idx, err);
+		goto error;
+	}
 
-	rc = rtas_set_indicator(ISOLATION_STATE, drc_index, UNISOLATE);
-	if (rc) {
-		rtas_set_indicator(ALLOCATION_STATE, drc_index, ALLOC_UNUSABLE);
-		return rc;
+	err = rtas_set_indicator(ISOLATION_STATE, idx, UNISOLATE);
+	if (err) {
+		pr_err("acquire: unisolate error for index 0x%x: %d\n", idx, err);
+		goto unuse;
 	}
 
 	return 0;
+unuse:
+	int unuse_err = rtas_set_indicator(ALLOCATION_STATE, idx, ALLOC_UNUSABLE);
+	if (unuse_err) {
+		pr_crit("acquire: failed to revert allocation state for index 0x%x (%d)\n",
+			idx, unuse_err);
+	}
+error:
+	return err;
 }
 
 int dlpar_release_drc(u32 idx)
@@ -306,6 +325,7 @@ int dlpar_release_drc(u32 idx)
 		pr_err("release: sensor state error for index 0x%x: %d\n", idx, err);
 		goto error;
 	} else if (sensor_state != DR_ENTITY_PRESENT) {
+		err = -EIO;
 		pr_err("release: unexpected sensor state %u for index 0x%x\n", sensor_state, idx);
 		goto error;
 	}
